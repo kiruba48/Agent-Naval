@@ -1,3 +1,9 @@
-import OpenAI from 'openai'
+import 'dotenv/config';  
+import { openai } from '@ai-sdk/openai';
 
-export const openai = new OpenAI()
+export {openai}
+
+
+// import OpenAI from 'openai'
+
+// export const openai = new OpenAI()
