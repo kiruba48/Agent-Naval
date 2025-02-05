@@ -19,6 +19,7 @@
   "dependencies": {
     "@ai-sdk/anthropic": "^1.1.6",
     "@ai-sdk/openai": "^1.1.6",
+    "@types/pdfjs-dist": "^2.10.378",
     "ai": "^4.1.15",
     "chromadb": "^1.10.4",
     "dotenv": "^16.4.5",
@@ -28,6 +29,7 @@
     "lowdb": "^7.0.1",
     "openai": "^4.81.0",
     "ora": "^8.1.1",
+    "pdfjs-dist": "^4.10.38",
     "readline-sync": "^1.4.10",
     "terminal-image": "^3.0.0",
     "tsx": "^4.19.2",

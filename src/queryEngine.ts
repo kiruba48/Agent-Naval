@@ -7,12 +7,32 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 if (!OPENAI_API_KEY) throw new Error("Missing OpenAI API Key!");
 
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
-const chroma = new ChromaClient(); // Connects to local ChromaDB instance
+
+// ChromaDB connection with retry logic
+async function getChromaClient(retries = 3, delay = 1000): Promise<ChromaClient> {
+    for (let i = 0; i < retries; i++) {
+        try {
+            const client = new ChromaClient();
+            // Test the connection
+            await client.heartbeat();
+            return client;
+        } catch (error) {
+            console.log(`ChromaDB connection attempt ${i + 1} failed. ${i < retries - 1 ? 'Retrying...' : ''}`);
+            if (i < retries - 1) {
+                await new Promise(resolve => setTimeout(resolve, delay));
+            } else {
+                throw new Error('Failed to connect to ChromaDB. Make sure the server is running.');
+            }
+        }
+    }
+    throw new Error('Failed to connect to ChromaDB after retries');
+}
 
 /**
  * Retrieve the most relevant text chunks from ChromaDB.
  */
 async function findRelevantChunks(query: string, collectionName: string, topK = 3) {
+    const chroma = await getChromaClient();
     const collection = await chroma.getCollection({ name: collectionName });
 
     const queryEmbedding = await openai.embeddings.create({

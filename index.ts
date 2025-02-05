@@ -2,6 +2,8 @@ import * as readlineSync from "readline-sync";
 import { createVectorStore } from "./src/vectorStore";
 import { answerQuery } from "./src/queryEngine";
 import 'dotenv/config'
+import * as fs from 'fs';
+import * as path from 'path';
 
 // Add global error handlers
 process.on('uncaughtException', (error) => {
@@ -15,12 +17,20 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 const COLLECTION_NAME = "naval_collection";
-const FILE_PATH = "./data/Naval_Incerto.epub";
+const DATA_DIR = "./data";
 
-// Initial PDF processing (only run once)
+// Get all PDF and EPUB files from the data directory
+function getDataFiles(): string[] {
+    return fs.readdirSync(DATA_DIR)
+        .filter(file => file.endsWith('.pdf') || file.endsWith('.epub'))
+        .map(file => path.join(DATA_DIR, file));
+}
+
+// Initial file processing (only run once)
 async function setup() {
-    console.log("📥 Processing PDF and creating vector store...");
-    await createVectorStore(FILE_PATH, COLLECTION_NAME);
+    const files = getDataFiles();
+    console.log(`📥 Processing ${files.length} files and creating vector store...`);
+    await createVectorStore(files, COLLECTION_NAME);
 }
 
 // Interactive loop for user queries

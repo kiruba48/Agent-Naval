@@ -1,5 +1,14 @@
 import fs from "fs";
 import EPUB from "epub";
+import * as pdfjsLib from 'pdfjs-dist';
+import { fileURLToPath } from 'url';
+import path from 'path';
+
+// Configure PDF.js worker
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const workerPath = path.join(__dirname, '../node_modules/pdfjs-dist/build/pdf.worker.mjs');
+pdfjsLib.GlobalWorkerOptions.workerSrc = workerPath;
 
 /**
  * Cleans text by removing special characters and normalizing whitespace.
@@ -8,12 +17,17 @@ function cleanText(text: string): string {
     return text.replace(/[^a-zA-Z0-9.,!?'\s]/g, "").replace(/\s+/g, " ").trim();
 }
 
+export interface ProcessedChunk {
+    content: string;
+    sourceFile: string;
+}
+
 /**
- * Splits text into manageable chunks.
+ * Splits text into manageable chunks with source tracking.
  */
-function chunkText(text: string, chunkSize = 500, chunkOverlap = 100): string[] {
+function chunkText(text: string, sourceFile: string, chunkSize = 500, chunkOverlap = 100): ProcessedChunk[] {
     const words = text.split(" ");
-    const chunks: string[] = [];
+    const chunks: ProcessedChunk[] = [];
     let currentChunk: string[] = [];
     let currentLength = 0;
 
@@ -22,7 +36,10 @@ function chunkText(text: string, chunkSize = 500, chunkOverlap = 100): string[] 
         currentLength += word.length + 1; // +1 for space
 
         if (currentLength >= chunkSize) {
-            chunks.push(currentChunk.join(" "));
+            chunks.push({
+                content: currentChunk.join(" "),
+                sourceFile
+            });
             // Keep last few words for overlap
             const overlapWords = currentChunk.slice(-Math.floor(chunkOverlap / 10));
             currentChunk = overlapWords;
@@ -31,7 +48,10 @@ function chunkText(text: string, chunkSize = 500, chunkOverlap = 100): string[] 
     }
 
     if (currentChunk.length > 0) {
-        chunks.push(currentChunk.join(" "));
+        chunks.push({
+            content: currentChunk.join(" "),
+            sourceFile
+        });
     }
 
     return chunks;
@@ -40,7 +60,7 @@ function chunkText(text: string, chunkSize = 500, chunkOverlap = 100): string[] 
 /**
  * Processes an EPUB file and returns text chunks.
  */
-export async function processFile(filePath: string): Promise<string[]> {
+async function processEPUB(filePath: string): Promise<ProcessedChunk[]> {
     if (!filePath.endsWith(".epub")) {
         throw new Error("Unsupported file format. Only EPUB files are supported.");
     }
@@ -52,7 +72,7 @@ export async function processFile(filePath: string): Promise<string[]> {
     console.log(`📘 Processing EPUB: ${filePath}`);
     
     try {
-        const result = await new Promise<{ text: string; metadata: { title: string; creator: string; language: string; chapters: { title: string; text: string; }[]; }; }>((resolve, reject) => {
+        return new Promise<ProcessedChunk[]>((resolve, reject) => {
             const epub = new EPUB(filePath);
             
             epub.on('end', () => {
@@ -79,53 +99,51 @@ export async function processFile(filePath: string): Promise<string[]> {
                 console.log(`Found ${flowLength} chapters`);
                 let processedChapters = 0;
 
-                flowItems.forEach((item, index) => {
+                const chapterPromises = flowItems.map((item, index) => {
                     if (!item || !item.id) {
                         console.log(`Skipping invalid chapter at index ${index}`);
                         processedChapters++;
-                        return;
+                        return Promise.resolve('');
                     }
 
                     console.log(`Processing chapter ${index + 1}/${flowLength}: ${item.id}`);
-                    
-                    epub.getChapter(item.id, (err, text) => {
-                        if (err) {
-                            console.error(`Error extracting chapter ${item.id}:`, err);
-                        } else {
-                            // Clean chapter text
-                            const cleanedText = text
-                                .replace(/<[^>]*>/g, '')  // Remove HTML tags
-                                .replace(/\s+/g, ' ')     // Normalize whitespace
-                                .trim();
-                            
-                            if (cleanedText) {
-                                fullText += cleanedText + '\n\n';
-                                
-                                chapterTexts.push({
-                                    title: item.id,
-                                    text: cleanedText
-                                });
-                                console.log(`Added chapter ${item.id} (${cleanedText.length} chars)`);
-                            } else {
-                                console.log(`Skipping empty chapter ${item.id}`);
-                            }
-                        }
 
-                        processedChapters++;
-                        console.log(`Progress: ${processedChapters}/${flowLength} chapters`);
-                        
-                        // Resolve when all chapters are processed
-                        if (processedChapters === flowLength) {
-                            console.log('All chapters processed, generating final text...');
-                            resolve({
-                                text: fullText,
-                                metadata: {
-                                    ...metadata,
-                                    chapters: chapterTexts
+                    return new Promise<string>((resolve) => {
+                        epub.getChapter(item.id, (error: Error | null, text: string) => {
+                            if (error) {
+                                console.error(`Error processing chapter ${item.id}:`, error);
+                                resolve('');
+                            } else {
+                                const cleanedText = cleanText(text);
+                                if (cleanedText.length > 0) {
+                                    chapterTexts.push({
+                                        title: item.id,
+                                        text: cleanedText
+                                    });
+                                    console.log(`Added chapter ${item.id} (${cleanedText.length} chars)`);
+                                } else {
+                                    console.log(`Skipping empty chapter ${item.id}`);
                                 }
-                            });
-                        }
+                                resolve(cleanedText);
+                            }
+                        });
                     });
+                });
+
+                Promise.all(chapterPromises).then(chapterTexts => {
+                    const text = chapterTexts.join('\n\n');
+                    console.log('Generating text chunks...');
+                    const chunks = chunkText(text, filePath);
+                    
+                    if (!chunks.length) {
+                        throw new Error("Failed to generate text chunks");
+                    }
+
+                    console.log(`Generated ${chunks.length} text chunks`);
+                    resolve(chunks);
+                }).catch(error => {
+                    console.error("Error processing EPUB:", error);
+                    reject(error);
                 });
             });
 
@@ -134,25 +152,50 @@ export async function processFile(filePath: string): Promise<string[]> {
                 reject(err);
             });
 
-            console.log('Starting EPUB parsing...');
             epub.parse();
         });
-
-        if (!result.text.trim()) {
-            throw new Error("No valid text content found in the EPUB file");
-        }
-
-        console.log('Generating text chunks...');
-        const chunks = chunkText(result.text);
-        
-        if (!chunks.length) {
-            throw new Error("Failed to generate text chunks");
-        }
-
-        console.log(`Generated ${chunks.length} text chunks`);
-        return chunks;
     } catch (error) {
-        console.error("Error processing EPUB:", error);
+        console.error("Error in processEPUB:", error);
         throw error;
     }
+}
+
+/**
+ * Processes a PDF file and returns text chunks.
+ */
+async function processPDF(filePath: string): Promise<ProcessedChunk[]> {
+    const dataBuffer = new Uint8Array(fs.readFileSync(filePath));
+    const pdfDoc = await pdfjsLib.getDocument(dataBuffer).promise;
+    
+    let fullText = '';
+    for (let i = 1; i <= pdfDoc.numPages; i++) {
+        const page = await pdfDoc.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = cleanText(textContent.items
+            .map(item => 'str' in item ? item.str : '')
+            .join(' '));
+        fullText += pageText + '\n';
+    }
+    
+    return chunkText(fullText, filePath);
+}
+
+/**
+ * Processes a file (EPUB or PDF) and returns text chunks.
+ */
+export async function processFile(filePaths: string | string[]): Promise<ProcessedChunk[]> {
+    const paths = Array.isArray(filePaths) ? filePaths : [filePaths];
+    
+    // Process files in parallel
+    const results = await Promise.all(paths.map(async (filePath) => {
+        if (filePath.endsWith('.epub')) {
+            return processEPUB(filePath);
+        } else if (filePath.endsWith('.pdf')) {
+            return processPDF(filePath);
+        }
+        throw new Error('Unsupported file format');
+    }));
+
+    // Flatten all chunks
+    return results.flat();
 }
