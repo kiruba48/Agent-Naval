@@ -1,6 +1,7 @@
 import { OpenAI } from "openai";
 import { ChromaClient } from "chromadb";
 import dotenv from "dotenv";
+import { embeddingFunction } from "./vectorStore";
 
 dotenv.config();
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
@@ -33,7 +34,14 @@ async function getChromaClient(retries = 3, delay = 1000): Promise<ChromaClient>
  */
 async function findRelevantChunks(query: string, collectionName: string, topK = 3) {
     const chroma = await getChromaClient();
-    const collection = await chroma.getCollection({ name: collectionName });
+    const collection = await chroma.getCollection({ 
+        name: collectionName,
+        embeddingFunction: {
+            generate: async (texts: string[]): Promise<number[][]> => {
+                return embeddingFunction.generate(texts);
+            }
+        }
+    });
 
     const queryEmbedding = await openai.embeddings.create({
         model: "text-embedding-3-small",
@@ -45,7 +53,14 @@ async function findRelevantChunks(query: string, collectionName: string, topK = 
         nResults: topK,
     });
 
-    return results.metadatas?.flatMap((meta) => meta?.text) ?? [];
+    return results.metadatas?.flatMap((metaArray) => 
+        metaArray?.map((meta) => {
+            if (meta && 'text' in meta) {
+                return meta.text;
+            }
+            return undefined;
+        })
+    ).filter((text): text is string => text !== undefined && text !== null) ?? [];
 }
 
 /**

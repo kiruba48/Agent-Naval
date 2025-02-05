@@ -1,0 +1,18 @@
+version: '3.9'
+
+services:
+  chromadb:
+    image: chromadb/chroma:latest
+    environment:
+      - ALLOW_CORS=TRUE
+      - CHROMA_SERVER_CORS_ALLOW_ORIGINS=["https://chroma-ui.vercel.app", "http://localhost:3000"]
+      - CHROMA_SERVER_HOST=0.0.0.0
+      - CHROMA_SERVER_PORT=8000
+    ports:
+      - 8000:8000
+    volumes:
+      - chroma_data:/chroma/chroma
+
+volumes:
+  chroma_data:
+    driver: local
