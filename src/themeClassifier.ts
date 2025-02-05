@@ -1,4 +1,12 @@
-import { spawn } from 'child_process';
+import { OpenAI } from "openai";
+import dotenv from "dotenv";
+
+// Load environment variables
+dotenv.config();
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+if (!OPENAI_API_KEY) throw new Error("Missing OpenAI API Key!");
+
+const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
 // Core themes that we'll classify content into
 export const CORE_THEMES = [
@@ -15,36 +23,9 @@ export const CORE_THEMES = [
     'happiness',
 ];
 
-interface ThemeClassificationResult {
+export interface ThemeClassificationResult {
     themes: string[];
     confidence: { [key: string]: number };
-}
-
-// Singleton LLM service process
-let llmServiceProcess: ReturnType<typeof spawn> | null = null;
-let isServiceReady = false;
-
-function getLLMService() {
-    if (!llmServiceProcess) {
-        llmServiceProcess = spawn('./venv/bin/python', ['./tools/llm_service.py']);
-        
-        if (llmServiceProcess && llmServiceProcess.stderr) {
-            llmServiceProcess.stderr.on('data', (data) => {
-                console.error('LLM Service Error:', data.toString());
-            });
-        }
-
-        if (llmServiceProcess) {
-            llmServiceProcess.on('exit', (code) => {
-                console.log('LLM Service exited with code:', code);
-                llmServiceProcess = null;
-                isServiceReady = false;
-            });
-        }
-
-        isServiceReady = true;
-    }
-    return llmServiceProcess;
 }
 
 /**
@@ -53,64 +34,51 @@ function getLLMService() {
  * @returns Promise<ThemeClassificationResult>
  */
 export async function classifyThemes(text: string): Promise<ThemeClassificationResult> {
-    return new Promise((resolve, reject) => {
-        const service = getLLMService();
-        if (!service || !service.stdin || !service.stdout) {
-            reject(new Error('Failed to start LLM service'));
-            return;
-        }
-
-        if (!service.stdout) {
-            throw new Error('LLM service stdout is not available');
-        }
-        
-        let output = '';
-
+    try {
+        console.log('🔍 Analyzing text for theme classification...');
         const prompt = `Analyze the following text and identify which of these themes are present [respond with a JSON object containing 'themes' array and 'confidence' object with scores between 0-1]:\n
-Themes: mindfulness, entrepreneurship, philosophy, wealth-building, leadership, productivity, personal-growth, decision-making, relationships, health-wellness, happiness\n
-Text: "${text.replace(/"/g, '\\"')}"\n
-Expected format:
-{
-    "themes": ["theme1", "theme2"],
-    "confidence": {
-        "theme1": 0.8,
-        "theme2": 0.7
-    }
-}`;
+Possible themes: ${CORE_THEMES.join(', ')}\n
+Text to analyze:\n${text}`;
 
-        // Send request to service
-        const request = {
-            prompt,
-            model: 'gpt-4'
-        };
+        const completion = await openai.chat.completions.create({
+            messages: [{ role: "user", content: prompt }],
+            model: "gpt-4",
+            temperature: 0,
+            response_format: { type: "json_object" }
+        });
+
+        console.log('✨ Received response from OpenAI');
+        const response = completion.choices[0].message.content;
+        if (!response) {
+            throw new Error('No response from OpenAI');
+        }
+
+        const result = JSON.parse(response);
+        const filteredThemes = result.themes.filter((theme: string) => 
+            CORE_THEMES.includes(theme) && 
+            result.confidence[theme] >= 0.6
+        );
         
-        service.stdin.write(JSON.stringify(request) + '\n');
+        console.log(`📋 Identified themes: ${filteredThemes.length > 0 ? filteredThemes.join(', ') : 'none'}`);
+        if (filteredThemes.length > 0) {
+            console.log('📊 Confidence scores:');
+            filteredThemes.forEach((theme: string) => {
+                console.log(`   ${theme}: ${(result.confidence[theme] * 100).toFixed(1)}%`);
+            });
+        }
 
-        const responseHandler = (data: Buffer) => {
-            const chunk = data.toString();
-            try {
-                const response = JSON.parse(chunk);
-                if (response.error) {
-                    service.stdout!.removeListener('data', responseHandler);
-                    reject(new Error(response.error));
-                } else if (response.response) {
-                    service.stdout!.removeListener('data', responseHandler);
-                    const result = JSON.parse(response.response);
-                    resolve({
-                        themes: result.themes.filter((theme: string) => 
-                            CORE_THEMES.includes(theme) && 
-                            result.confidence[theme] >= 0.6
-                        ),
-                        confidence: result.confidence
-                    });
-                }
-            } catch (e) {
-                output += chunk;
-            }
+        return {
+            themes: filteredThemes,
+            confidence: Object.fromEntries(
+                Object.entries(result.confidence).filter(([theme, _]) => 
+                    CORE_THEMES.includes(theme)
+                )
+            ) as { [key: string]: number }
         };
-
-        service.stdout.on('data', responseHandler);
-    });
+    } catch (error) {
+        console.error('Error classifying themes:', error);
+        throw error;
+    }
 }
 
 /**
@@ -118,12 +86,18 @@ Expected format:
  * @param chunks Array of text chunks to classify
  * @param batchSize Number of chunks to process in parallel
  */
-export async function batchClassifyThemes(chunks: string[], batchSize = 5): Promise<ThemeClassificationResult[]> {
+export async function batchClassifyThemes(
+    chunks: string[], 
+    batchSize = 5
+): Promise<ThemeClassificationResult[]> {
     const results: ThemeClassificationResult[] = [];
+    
     for (let i = 0; i < chunks.length; i += batchSize) {
         const batch = chunks.slice(i, i + batchSize);
-        const batchResults = await Promise.all(batch.map(chunk => classifyThemes(chunk)));
+        const promises = batch.map(chunk => classifyThemes(chunk));
+        const batchResults = await Promise.all(promises);
         results.push(...batchResults);
     }
+    
     return results;
 }

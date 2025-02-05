@@ -37,12 +37,20 @@ async function chunkText(text: string, sourceFile: string, baseMetadata: Omit<Pr
     const chunks: ProcessedChunk[] = [];
     let currentChunk: string[] = [];
     let currentLength = 0;
+    let chunkNumber = 0;
+    
+    // Estimate total chunks
+    const estimatedTotalChunks = Math.ceil(text.length / (chunkSize - chunkOverlap));
+    console.log(`Processing ${sourceFile}: Estimated ${estimatedTotalChunks} chunks to process`);
 
     for (const word of words) {
         currentChunk.push(word);
         currentLength += word.length + 1; // +1 for space
 
         if (currentLength >= chunkSize) {
+            chunkNumber++;
+            console.log(`Processing chunk ${chunkNumber}/${estimatedTotalChunks} (${Math.round(chunkNumber/estimatedTotalChunks * 100)}%)`);
+            
             const content = currentChunk.join(" ");
             const themeResult = await classifyThemes(content);
             chunks.push({
