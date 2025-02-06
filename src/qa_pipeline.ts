@@ -33,6 +33,135 @@ function checkQAPairQuality(qaPair: QAPair & { requiresReview?: boolean }): bool
     requiresReview = true;
   }
 
+  // QuestionTypeCheck: Check if the question starts with appropriate question words
+  const questionWords = ['what', 'why', 'how', 'when', 'where', 'who', 'which', 'explain', 'describe', 'can', 'does', 'do'];
+  const startsWithQuestionWord = questionWords.some(word => 
+    qaPair.question.toLowerCase().trim().startsWith(word)
+  );
+  if (!startsWithQuestionWord) {
+    console.log('[QualityCheck] Failed QuestionTypeCheck: Question does not start with a question word');
+    requiresReview = true;
+  }
+
+  // KeywordOverlapCheck: Check if key terms from the question appear in the answer
+  const stopWords = new Set([
+    // Question words
+    'what', 'why', 'how', 'when', 'where', 'who', 'which',
+    // Common verbs
+    'is', 'are', 'was', 'were', 'be', 'been', 'being',
+    'have', 'has', 'had', 'do', 'does', 'did',
+    'can', 'could', 'will', 'would', 'should', 'must',
+    // Common prepositions
+    'in', 'on', 'at', 'to', 'for', 'with', 'by', 'from', 'of',
+    // Common articles and conjunctions
+    'the', 'a', 'an', 'and', 'or', 'but', 'if', 'then',
+    // Common adjectives
+    'this', 'that', 'these', 'those',
+    // Common question starters
+    'explain', 'describe', 'discuss', 'list', 'define',
+    // Common qualifiers
+    'according', 'considered', 'regarding'
+  ]);
+  
+  // Get word variations (simple version - handle common word forms)
+  const getWordVariations = (words: string[]) => {
+    const variations = new Set<string>();
+    
+    words.forEach(word => {
+      // Add original word
+      variations.add(word);
+      
+      // Handle common suffixes
+      const commonSuffixes = ['ing', 'ed', 's', 'es', 'er', 'est', 'ly', 'ment', 'ness', 'ity', 'tion', 'sion'];
+      const wordBase = word.toLowerCase();
+      
+      // Try removing each suffix and add the base form
+      for (const suffix of commonSuffixes) {
+        if (wordBase.endsWith(suffix) && wordBase.length > suffix.length + 3) {
+          const base = wordBase.slice(0, -suffix.length);
+          variations.add(base);
+          
+          // Add common variations of the base
+          if (suffix === 's' || suffix === 'es') {
+            variations.add(base + 'ing');  // plural -> gerund
+            variations.add(base + 'ed');   // plural -> past tense
+          } else if (suffix === 'ing') {
+            variations.add(base + 'e');    // running -> run
+            variations.add(base + 'ed');   // running -> ran
+          } else if (suffix === 'ed') {
+            variations.add(base + 'ing');  // walked -> walking
+            variations.add(base + 'e');    // walked -> walk
+          }
+        }
+      }
+      
+      // Handle 'y' to 'i' transformation
+      if (wordBase.endsWith('y')) {
+        const base = wordBase.slice(0, -1);
+        variations.add(base + 'ies');  // study -> studies
+        variations.add(base + 'ied');  // study -> studied
+        variations.add(base + 'ier');  // happy -> happier
+        variations.add(base + 'iest'); // happy -> happiest
+      }
+      
+      // Handle common prefixes by removing them
+      const commonPrefixes = ['un', 'in', 'im', 'ir', 're', 'dis', 'pre', 'pro', 'non'];
+      for (const prefix of commonPrefixes) {
+        if (wordBase.startsWith(prefix) && wordBase.length > prefix.length + 3) {
+          variations.add(wordBase.slice(prefix.length));
+        }
+      }
+    });
+    
+    return variations;
+  };
+  
+  const questionKeywords = qaPair.question.toLowerCase()
+    .split(/\s+/)
+    .filter(word => word.length > 3)  // Filter out short words
+    .filter(word => !stopWords.has(word))
+    .map(word => word.replace(/[^a-z]/g, '')); // Remove non-alphabetic characters
+  
+  const answerWords = qaPair.answer.toLowerCase()
+    .split(/\s+/)
+    .map(word => word.replace(/[^a-z]/g, '')); // Remove non-alphabetic characters
+  
+  const questionVariations = getWordVariations(questionKeywords);
+  const answerVariations = getWordVariations(answerWords);
+  
+  // Check for semantic overlap using word variations and partial matches
+  const hasKeywordOverlap = questionVariations.size === 0 || // Skip check if no keywords found
+    Array.from(questionVariations).some(qWord => 
+      answerVariations.has(qWord) || 
+      Array.from(answerVariations).some(aWord => {
+        // Only consider meaningful partial matches
+        if (qWord.length < 4 || aWord.length < 4) return false;
+        // Check both directions with a minimum length requirement
+        const minMatchLength = Math.min(4, Math.floor(Math.min(qWord.length, aWord.length) * 0.75));
+        return (qWord.includes(aWord) && aWord.length >= minMatchLength) || 
+               (aWord.includes(qWord) && qWord.length >= minMatchLength);
+      })
+    );
+  
+  if (!hasKeywordOverlap) {
+    console.log('[QualityCheck] Failed KeywordOverlapCheck: Answer does not contain key terms from question');
+    console.log(`[QualityCheck] Question keywords: ${Array.from(questionVariations).join(', ')}`);
+    requiresReview = true;
+  }
+
+  // AnswerCompletenessCheck: Check if answer appears to be complete
+  const properEndingPunctuation = ['.', '!', '?'];
+  const hasProperEnding = properEndingPunctuation.some(punct => 
+    qaPair.answer.trim().endsWith(punct)
+  );
+  const minSentences = 1;
+  const sentences = qaPair.answer.split(/[.!?]+/).filter(s => s.trim().length > 0);
+  
+  if (!hasProperEnding || sentences.length < minSentences) {
+    console.log('[QualityCheck] Failed AnswerCompletenessCheck: Answer may be incomplete');
+    requiresReview = true;
+  }
+
   // DuplicateContentCheck / QuestionEchoCheck: Check if answer is the same as question
   if (qaPair.question.trim().toLowerCase() === qaPair.answer.trim().toLowerCase()) {
     console.log('[QualityCheck] Failed QuestionEchoCheck: Answer is identical to question');
@@ -41,7 +170,7 @@ function checkQAPairQuality(qaPair: QAPair & { requiresReview?: boolean }): bool
 
   // QuestionAnswerLengthRatioCheck: Check if answer length ratio is abnormal, using a ratio threshold
   const ratio = answerWordCount / (questionWordCount || 1);
-  if (ratio < 0.5 || ratio > 3) {
+  if (ratio < 0.5 || ratio > 6) {  
     console.log(`[QualityCheck] Failed QuestionAnswerLengthRatioCheck: Ratio is ${ratio.toFixed(2)}`);
     requiresReview = true;
   }
@@ -61,10 +190,6 @@ function checkQAPairQuality(qaPair: QAPair & { requiresReview?: boolean }): bool
     console.log('[QualityCheck] Failed SourceReferenceCheck: Invalid source reference');
     requiresReview = true;
   }
-
-  // Additional semantic/factual checks could be added here
-  // For now, we log that they're not implemented
-  // console.log('[QualityCheck] KeywordOverlapCheck, ChunkTopicAlignmentCheck, NamedEntityMismatchCheck are not implemented yet.');
 
   return requiresReview;
 }
