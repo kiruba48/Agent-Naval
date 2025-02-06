@@ -55,3 +55,16 @@ The theme classifier is failing to parse JSON responses from the LLM API, causin
 - When using LLMs for structured output, include example formats in the prompt
 - Stop environment variable loading once required variables are found
 - Use module-level flags to prevent duplicate initialization
+
+# Today's Lessons (2025-02-06)
+
+## TypeScript Type System
+- When extending interfaces in TypeScript, optional properties (`property?: type`) in the base interface are not compatible with required properties (`property: type`) in the extended interface
+- When transforming arrays of objects with optional properties to arrays with required properties, use explicit mapping with the nullish coalescing operator (`??`) to provide default values
+- TypeScript's type system helps catch potential runtime errors by enforcing proper property presence, especially important in data processing pipelines
+
+## Q&A Pipeline Development
+- Maintain a clear separation between base data types (like QAPair) and their processed versions (like FinalQAPair) to ensure data validation at compile time
+- Use explicit type transformations when moving data through pipeline stages to ensure data integrity
+- Document pipeline stages and data transformations in both code comments and project documentation (INSTRUCTIONS.md) for better maintainability
+- Keep track of completed and remaining tasks in a structured format to maintain project momentum and clarity

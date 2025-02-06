@@ -3,5 +3,10 @@
     "question": "What does the text discuss regarding workday practices?",
     "answer": "The text discusses the importance of mindfulness and regular breaks in a workday.",
     "source_reference": "Sample Document, Chapter 1, Paragraph 1"
+  },
+  "62090b4cca90305c2413222c656c7d50": {
+    "question": "How can regular breaks and mindfulness exercises impact productivity?",
+    "answer": "Regular breaks and mindfulness exercises can improve productivity and reduce stress.",
+    "source_reference": "sample, Paragraph 1"
   }
 }

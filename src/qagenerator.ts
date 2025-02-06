@@ -2,6 +2,7 @@ import { generateText } from './llm';
 import fs from 'fs';
 import path from 'path';
 import { generateContentHash } from './themeCache';
+import { QAPair } from './qa_pipeline';
 
 /**
  * Generates a candidate Q&A pair from a text chunk using a language model.
@@ -37,7 +38,7 @@ function saveQACache(): void {
   }
 }
 
-export async function generateQAPair(textChunk: string, sourceReference: string): Promise<{ question: string; answer: string; source_reference: string }> {
+export async function generateQAPair(textChunk: string, sourceReference: string): Promise<QAPair> {
   // Compute a unique key for this text chunk using the existing generateContentHash
   const cacheKey = generateContentHash(textChunk + sourceReference);
 
@@ -99,7 +100,7 @@ Respond with only the JSON object.
  * @param textChunks - An array of objects containing text and their source reference.
  * @returns A promise that resolves to an array of Q&A objects.
  */
-export async function generateQAPairsForChunks(textChunks: { text: string; sourceReference: string }[]): Promise<{ question: string; answer: string; source_reference: string }[]> {
+export async function generateQAPairsForChunks(textChunks: { text: string; sourceReference: string }[]): Promise<QAPair[]> {
   const qaPairs = [];
   for (const chunk of textChunks) {
     try {

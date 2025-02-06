@@ -180,7 +180,19 @@ export async function processPDF(filePath: string): Promise<ProcessedChunk[]> {
 }
 
 /**
- * Processes a file (EPUB or PDF) and returns text chunks.
+ * Processes a text file and returns text chunks.
+ */
+export async function processText(filePath: string): Promise<ProcessedChunk[]> {
+    console.log(`[processText] Processing text file: ${filePath}`);
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const title = path.basename(filePath, path.extname(filePath));
+    const baseMetadata = { title, author: '', chapter: '' };
+    // Use chunkText to split the content into chunks
+    return await chunkText(content, filePath, baseMetadata);
+}
+
+/**
+ * Processes a file (EPUB, PDF, or text) and returns text chunks.
  */
 export async function processFile(filePaths: string | string[]): Promise<ProcessedChunk[]> {
     const paths = Array.isArray(filePaths) ? filePaths : [filePaths];
@@ -191,6 +203,8 @@ export async function processFile(filePaths: string | string[]): Promise<Process
             return processEPUB(filePath);
         } else if (filePath.endsWith('.pdf')) {
             return processPDF(filePath);
+        } else if (filePath.endsWith('.txt')) {
+            return processText(filePath);
         }
         throw new Error('Unsupported file format');
     }));
