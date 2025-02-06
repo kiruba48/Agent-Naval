@@ -26,13 +26,14 @@ export interface ProcessedChunk {
         author?: string;
         chapter?: string;
         themes: string[];
+        sourceReference: string;
     };
 }
 
 /**
  * Splits text into manageable chunks with source tracking.
  */
-async function chunkText(text: string, sourceFile: string, baseMetadata: Omit<ProcessedChunk['metadata'], 'themes'>, chunkSize = 1000, chunkOverlap = 200): Promise<ProcessedChunk[]> {
+async function chunkText(text: string, sourceFile: string, baseMetadata: Omit<ProcessedChunk['metadata'], 'themes' | 'sourceReference'>, chunkSize = 1000, chunkOverlap = 200): Promise<ProcessedChunk[]> {
     const words = text.split(" ");
     const chunks: ProcessedChunk[] = [];
     let currentChunk: string[] = [];
@@ -53,12 +54,15 @@ async function chunkText(text: string, sourceFile: string, baseMetadata: Omit<Pr
             
             const content = currentChunk.join(" ");
             const themeResult = await classifyThemes(content);
+            // Compute source reference
+            const sourceReference = `${baseMetadata.title || path.basename(sourceFile)}${baseMetadata.chapter ? `, Chapter ${baseMetadata.chapter}` : ''}, Paragraph ${chunkNumber}`;
             chunks.push({
                 content,
                 sourceFile,
                 metadata: {
                     ...baseMetadata,
-                    themes: themeResult.themes
+                    themes: themeResult.themes,
+                    sourceReference
                 }
             });
             // Keep last few words for overlap
@@ -71,12 +75,15 @@ async function chunkText(text: string, sourceFile: string, baseMetadata: Omit<Pr
     if (currentChunk.length > 0) {
         const content = currentChunk.join(" ");
         const themeResult = await classifyThemes(content);
+        // Compute source reference for the final chunk
+        const sourceReference = `${baseMetadata.title || path.basename(sourceFile)}${baseMetadata.chapter ? `, Chapter ${baseMetadata.chapter}` : ''}, Paragraph ${chunkNumber + 1}`;
         chunks.push({
             content,
             sourceFile,
             metadata: {
                 ...baseMetadata,
-                themes: themeResult.themes
+                themes: themeResult.themes,
+                sourceReference
             }
         });
     }
