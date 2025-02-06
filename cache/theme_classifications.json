@@ -1,0 +1,382 @@
+{
+  "21ee8988d6821897470e557ab2b9754b": {
+    "timestamp": 1738843575472,
+    "result": {
+      "themes": [
+        "philosophy",
+        "personal-growth",
+        "decision-making"
+      ],
+      "confidence": {
+        "philosophy": 0.9,
+        "personal-growth": 0.7,
+        "decision-making": 0.6
+      }
+    }
+  },
+  "42a52c19d85cece189eb05f5ed7bca4f": {
+    "timestamp": 1738843577328,
+    "result": {
+      "themes": [
+        "philosophy",
+        "personal-growth",
+        "decision-making"
+      ],
+      "confidence": {
+        "philosophy": 0.8,
+        "personal-growth": 0.7,
+        "decision-making": 0.6,
+        "relationships": 0.5
+      }
+    }
+  },
+  "d13a3e680fadaf4047910e274d3ec4a0": {
+    "timestamp": 1738843579586,
+    "result": {
+      "themes": [
+        "philosophy",
+        "personal-growth",
+        "decision-making"
+      ],
+      "confidence": {
+        "mindfulness": 0.1,
+        "entrepreneurship": 0,
+        "philosophy": 0.9,
+        "wealth-building": 0,
+        "leadership": 0,
+        "productivity": 0,
+        "personal-growth": 0.8,
+        "decision-making": 0.7,
+        "relationships": 0,
+        "health-wellness": 0,
+        "happiness": 0
+      }
+    }
+  },
+  "98c4760c39b5adab578464e9c5d9a09e": {
+    "timestamp": 1738843582566,
+    "result": {
+      "themes": [
+        "philosophy",
+        "personal-growth",
+        "decision-making"
+      ],
+      "confidence": {
+        "mindfulness": 0.1,
+        "entrepreneurship": 0,
+        "philosophy": 0.8,
+        "wealth-building": 0,
+        "leadership": 0,
+        "productivity": 0.2,
+        "personal-growth": 0.7,
+        "decision-making": 0.6,
+        "relationships": 0,
+        "health-wellness": 0,
+        "happiness": 0
+      }
+    }
+  },
+  "c9b4c4158db317950a7c6d8f052c5e74": {
+    "timestamp": 1738843586204,
+    "result": {
+      "themes": [
+        "philosophy",
+        "relationships",
+        "health-wellness",
+        "personal-growth"
+      ],
+      "confidence": {
+        "mindfulness": 0.2,
+        "entrepreneurship": 0.1,
+        "philosophy": 0.8,
+        "wealth-building": 0.1,
+        "leadership": 0.2,
+        "productivity": 0.3,
+        "personal-growth": 0.7,
+        "decision-making": 0.5,
+        "relationships": 0.6,
+        "health-wellness": 0.7,
+        "happiness": 0.2
+      }
+    }
+  },
+  "b7fd4ec0c9954acc56c395f0d5d31b77": {
+    "timestamp": 1738843589552,
+    "result": {
+      "themes": [
+        "philosophy",
+        "personal-growth",
+        "health-wellness"
+      ],
+      "confidence": {
+        "philosophy": 0.8,
+        "personal-growth": 0.7,
+        "health-wellness": 0.6
+      }
+    }
+  },
+  "e20ca5e26eb5b75c45dfad01403530d0": {
+    "timestamp": 1738843592015,
+    "result": {
+      "themes": [
+        "philosophy",
+        "personal-growth",
+        "decision-making"
+      ],
+      "confidence": {
+        "philosophy": 0.8,
+        "personal-growth": 0.7,
+        "decision-making": 0.6,
+        "relationships": 0.5
+      }
+    }
+  },
+  "93f06f30f681243fb609a0d9226254b9": {
+    "timestamp": 1738843593536,
+    "result": {
+      "themes": [
+        "philosophy",
+        "personal-growth",
+        "health-wellness"
+      ],
+      "confidence": {
+        "philosophy": 0.8,
+        "personal-growth": 0.7,
+        "health-wellness": 0.9
+      }
+    }
+  },
+  "ce22fb9d08e821e3dc01062a1bbc8f24": {
+    "timestamp": 1738843595483,
+    "result": {
+      "themes": [
+        "philosophy",
+        "personal-growth",
+        "relationships"
+      ],
+      "confidence": {
+        "philosophy": 0.9,
+        "personal-growth": 0.7,
+        "relationships": 0.6
+      }
+    }
+  },
+  "544050517512931736cb026eec62e4ce": {
+    "timestamp": 1738843597720,
+    "result": {
+      "themes": [
+        "personal-growth",
+        "philosophy",
+        "decision-making"
+      ],
+      "confidence": {
+        "personal-growth": 0.8,
+        "philosophy": 0.7,
+        "decision-making": 0.6,
+        "relationships": 0.5
+      }
+    }
+  },
+  "55bfa1eaea95f6398e2b0378f619e92d": {
+    "timestamp": 1738843599885,
+    "result": {
+      "themes": [
+        "personal-growth",
+        "relationships",
+        "philosophy",
+        "decision-making"
+      ],
+      "confidence": {
+        "mindfulness": 0.2,
+        "entrepreneurship": 0.1,
+        "philosophy": 0.7,
+        "wealth-building": 0,
+        "leadership": 0.3,
+        "productivity": 0.4,
+        "personal-growth": 0.8,
+        "decision-making": 0.6,
+        "relationships": 0.7,
+        "health-wellness": 0.1,
+        "happiness": 0.5
+      }
+    }
+  },
+  "4767835a2435557aa94d62ffc3c57025": {
+    "timestamp": 1738843601356,
+    "result": {
+      "themes": [
+        "entrepreneurship",
+        "decision-making",
+        "personal-growth",
+        "leadership",
+        "productivity"
+      ],
+      "confidence": {
+        "entrepreneurship": 0.8,
+        "decision-making": 0.9,
+        "personal-growth": 0.7,
+        "leadership": 0.6,
+        "productivity": 0.7
+      }
+    }
+  },
+  "8f5bde5cd0ab828d11bcff5d6616bbc7": {
+    "timestamp": 1738843603495,
+    "result": {
+      "themes": [
+        "personal-growth",
+        "philosophy",
+        "relationships"
+      ],
+      "confidence": {
+        "mindfulness": 0.2,
+        "entrepreneurship": 0.1,
+        "philosophy": 0.8,
+        "wealth-building": 0,
+        "leadership": 0,
+        "productivity": 0.3,
+        "personal-growth": 0.7,
+        "decision-making": 0.4,
+        "relationships": 0.6,
+        "health-wellness": 0,
+        "happiness": 0.5
+      }
+    }
+  },
+  "aaa6473935e37c336b4f5fd18fe849b5": {
+    "timestamp": 1738843604741,
+    "result": {
+      "themes": [
+        "relationships",
+        "personal-growth",
+        "decision-making"
+      ],
+      "confidence": {
+        "relationships": 0.8,
+        "personal-growth": 0.7,
+        "decision-making": 0.6
+      }
+    }
+  },
+  "df0b805ecf32c2a2cc0bc4b4e1096772": {
+    "timestamp": 1738843607513,
+    "result": {
+      "themes": [
+        "personal-growth",
+        "relationships",
+        "decision-making"
+      ],
+      "confidence": {
+        "mindfulness": 0.1,
+        "entrepreneurship": 0,
+        "philosophy": 0.2,
+        "wealth-building": 0,
+        "leadership": 0,
+        "productivity": 0,
+        "personal-growth": 0.8,
+        "decision-making": 0.7,
+        "relationships": 0.6,
+        "health-wellness": 0,
+        "happiness": 0
+      }
+    }
+  },
+  "626930c8ceb6fd954865806fea24c9cd": {
+    "timestamp": 1738843609097,
+    "result": {
+      "themes": [
+        "personal-growth",
+        "decision-making",
+        "productivity"
+      ],
+      "confidence": {
+        "personal-growth": 0.8,
+        "decision-making": 0.7,
+        "productivity": 0.9
+      }
+    }
+  },
+  "b432af7e865902e86d7a2c5fa938f32b": {
+    "timestamp": 1738843611864,
+    "result": {
+      "themes": [
+        "philosophy",
+        "personal-growth",
+        "relationships"
+      ],
+      "confidence": {
+        "mindfulness": 0.2,
+        "entrepreneurship": 0.1,
+        "philosophy": 0.8,
+        "wealth-building": 0,
+        "leadership": 0.1,
+        "productivity": 0.3,
+        "personal-growth": 0.7,
+        "decision-making": 0.4,
+        "relationships": 0.6,
+        "health-wellness": 0,
+        "happiness": 0.2
+      }
+    }
+  },
+  "a61ff3ae891e5d5963e9ceb1f95832a4": {
+    "timestamp": 1738843613606,
+    "result": {
+      "themes": [
+        "personal-growth",
+        "philosophy",
+        "relationships"
+      ],
+      "confidence": {
+        "personal-growth": 0.8,
+        "philosophy": 0.7,
+        "relationships": 0.6
+      }
+    }
+  },
+  "b4b74482936aa52b3a55340134334487": {
+    "timestamp": 1738843616602,
+    "result": {
+      "themes": [
+        "philosophy",
+        "personal-growth",
+        "relationships"
+      ],
+      "confidence": {
+        "philosophy": 0.8,
+        "personal-growth": 0.7,
+        "relationships": 0.6,
+        "mindfulness": 0.2,
+        "entrepreneurship": 0.1,
+        "wealth-building": 0.1,
+        "leadership": 0.1,
+        "productivity": 0.1,
+        "decision-making": 0.2,
+        "health-wellness": 0.1,
+        "happiness": 0.1
+      }
+    }
+  },
+  "7a6943b0ba23eaca61da88314ba2d84a": {
+    "timestamp": 1738843620668,
+    "result": {
+      "themes": [
+        "philosophy",
+        "personal-growth"
+      ],
+      "confidence": {
+        "philosophy": 0.9,
+        "personal-growth": 0.7,
+        "mindfulness": 0.2,
+        "entrepreneurship": 0.1,
+        "wealth-building": 0.1,
+        "leadership": 0.1,
+        "productivity": 0.3,
+        "decision-making": 0.2,
+        "relationships": 0.1,
+        "health-wellness": 0.1,
+        "happiness": 0.1
+      }
+    }
+  }
+}

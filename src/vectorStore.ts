@@ -68,6 +68,20 @@ export const embeddingFunction = {
 };
 
 /**
+ * Utility function to reset the vector store (use only when needed)
+ */
+export async function resetVectorStore() {
+    console.log('Resetting vector store...');
+    try {
+        await vectorIndex.reset();
+        console.log('Vector store reset successfully');
+    } catch (error) {
+        console.error('Error resetting vector store:', error);
+        throw error;
+    }
+}
+
+/**
  * Creates or updates a vector store with processed chunks
  */
 export async function createVectorStore(filePaths: string | string[], collectionName: string) {

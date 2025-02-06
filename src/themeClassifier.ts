@@ -1,5 +1,6 @@
 import { openai, GPT4 } from './llm';
 import dotenv from "dotenv";
+import { getCachedThemes, cacheThemes } from './themeCache';
 
 // Load environment variables
 dotenv.config();
@@ -33,6 +34,13 @@ export interface ThemeClassificationResult {
  */
 export async function classifyThemes(text: string): Promise<ThemeClassificationResult> {
     try {
+        // Check cache first
+        const cached = getCachedThemes(text);
+        if (cached) {
+            console.log('📦 Using cached theme classification');
+            return cached;
+        }
+
         console.log('🔍 Analyzing text for theme classification...');
         const prompt = `Analyze the following text and identify which of these themes are present [respond with a JSON object containing 'themes' array and 'confidence' object with scores between 0-1]:\n
 Possible themes: ${CORE_THEMES.join(', ')}\n
@@ -65,7 +73,7 @@ Text to analyze:\n${text}`;
             });
         }
 
-        return {
+        const themeResult: ThemeClassificationResult = {
             themes: filteredThemes,
             confidence: Object.fromEntries(
                 Object.entries(result.confidence).filter(([theme, _]) => 
@@ -73,6 +81,11 @@ Text to analyze:\n${text}`;
                 )
             ) as { [key: string]: number }
         };
+
+        // Cache the result
+        cacheThemes(text, themeResult);
+
+        return themeResult;
     } catch (error) {
         console.error('Error classifying themes:', error);
         throw error;

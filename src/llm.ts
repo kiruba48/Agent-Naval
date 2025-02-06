@@ -12,6 +12,7 @@ export const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 export const GPT4 = "gpt-4o-mini";
 export const GPT35_TURBO = "gpt-3.5-turbo";
 export const TEXT_EMBEDDING = "text-embedding-3-small";
+export const EMBEDDING_DIMENSION = 1024;
 
 // Helper function for text generation
 export async function generateText(prompt: string, model = GPT4) {
@@ -28,6 +29,7 @@ export async function generateEmbeddings(texts: string[]) {
     const response = await openai.embeddings.create({
         model: TEXT_EMBEDDING,
         input: texts,
+        dimensions: EMBEDDING_DIMENSION,
     });
     return response.data.map(item => item.embedding);
 }
