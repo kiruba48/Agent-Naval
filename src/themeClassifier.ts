@@ -1,12 +1,10 @@
-import { OpenAI } from "openai";
+import { openai, GPT4 } from './llm';
 import dotenv from "dotenv";
 
 // Load environment variables
 dotenv.config();
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 if (!OPENAI_API_KEY) throw new Error("Missing OpenAI API Key!");
-
-const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
 // Core themes that we'll classify content into
 export const CORE_THEMES = [
@@ -42,7 +40,7 @@ Text to analyze:\n${text}`;
 
         const completion = await openai.chat.completions.create({
             messages: [{ role: "user", content: prompt }],
-            model: "gpt-4",
+            model: GPT4,
             temperature: 0,
             response_format: { type: "json_object" }
         });

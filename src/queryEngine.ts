@@ -1,66 +1,53 @@
-import { OpenAI } from "openai";
-import { ChromaClient } from "chromadb";
+import { Index } from "@upstash/vector";
 import dotenv from "dotenv";
-import { embeddingFunction } from "./vectorStore";
+import { openai, GPT4, generateEmbeddings } from './llm';
 
 dotenv.config();
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-if (!OPENAI_API_KEY) throw new Error("Missing OpenAI API Key!");
 
-const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+// Load and validate environment variables
+const UPSTASH_VECTOR_REST_URL = process.env.UPSTASH_VECTOR_REST_URL;
+const UPSTASH_VECTOR_REST_TOKEN = process.env.UPSTASH_VECTOR_REST_TOKEN;
 
-// ChromaDB connection with retry logic
-async function getChromaClient(retries = 3, delay = 1000): Promise<ChromaClient> {
-    for (let i = 0; i < retries; i++) {
-        try {
-            const client = new ChromaClient();
-            // Test the connection
-            await client.heartbeat();
-            return client;
-        } catch (error) {
-            console.log(`ChromaDB connection attempt ${i + 1} failed. ${i < retries - 1 ? 'Retrying...' : ''}`);
-            if (i < retries - 1) {
-                await new Promise(resolve => setTimeout(resolve, delay));
-            } else {
-                throw new Error('Failed to connect to ChromaDB. Make sure the server is running.');
-            }
-        }
-    }
-    throw new Error('Failed to connect to ChromaDB after retries');
-}
+if (!UPSTASH_VECTOR_REST_URL) throw new Error("Missing Upstash Vector REST URL!");
+if (!UPSTASH_VECTOR_REST_TOKEN) throw new Error("Missing Upstash Vector REST Token!");
+
+// Initialize Upstash Vector client
+const vectorIndex = new Index({
+    url: UPSTASH_VECTOR_REST_URL,
+    token: UPSTASH_VECTOR_REST_TOKEN
+});
 
 /**
- * Retrieve the most relevant text chunks from ChromaDB.
+ * Retrieve the most relevant text chunks from Upstash Vector.
  */
 async function findRelevantChunks(query: string, collectionName: string, topK = 3) {
-    const chroma = await getChromaClient();
-    const collection = await chroma.getCollection({ 
-        name: collectionName,
-        embeddingFunction: {
-            generate: async (texts: string[]): Promise<number[][]> => {
-                return embeddingFunction.generate(texts);
-            }
+    try {
+        // Generate embedding for the query
+        const queryEmbeddings = await generateEmbeddings([query]);
+        if (!queryEmbeddings[0]) {
+            throw new Error('Failed to generate query embedding');
         }
-    });
 
-    const queryEmbedding = await openai.embeddings.create({
-        model: "text-embedding-3-small",
-        input: query,
-    });
+        // Query Upstash Vector
+        const results = await vectorIndex.query({
+            vector: queryEmbeddings[0],
+            topK: topK,
+            includeMetadata: true,
+            includeVectors: false
+        }, { namespace: collectionName });
 
-    const results = await collection.query({
-        queryEmbeddings: [queryEmbedding.data[0].embedding],
-        nResults: topK,
-    });
-
-    return results.metadatas?.flatMap((metaArray) => 
-        metaArray?.map((meta) => {
-            if (meta && 'text' in meta) {
-                return meta.text;
+        // Extract content from results
+        return results.map(result => {
+            if (!result.metadata || typeof result.metadata !== 'object') {
+                console.warn(`Invalid metadata in result: ${result.id}`);
+                return undefined;
             }
-            return undefined;
-        })
-    ).filter((text): text is string => text !== undefined && text !== null) ?? [];
+            return result.metadata.content;
+        }).filter((content): content is string => content !== undefined);
+    } catch (error) {
+        console.error('Error querying vector store:', error);
+        throw error;
+    }
 }
 
 /**
@@ -70,12 +57,12 @@ export async function answerQuery(query: string, collectionName: string) {
     const systemPrompt = `You are a helpful AI assistant answering questions about Naval Ravikant's reading list.
     Use the following context to answer the question. If you cannot answer based on the context, say so.
     Don't mention that you're using any specific context - just answer naturally.`;
+    
     const relevantChunks = await findRelevantChunks(query, collectionName);
-
     console.log("Retrieved Context:", relevantChunks.join("\n\n"));
 
     const response = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: GPT4,
         messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: `Use the following context to answer:\n\n${relevantChunks.join("\n\n")}\n\nQuestion: ${query}` },

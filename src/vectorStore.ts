@@ -1,42 +1,22 @@
-import { OpenAI } from "openai";
-import { ChromaClient } from "chromadb";
+import { Index } from "@upstash/vector";
 import 'dotenv/config'; 
 import { processFile, ProcessedChunk } from "./processFile";
 import * as fs from 'fs';
 import * as path from 'path';
 import { batchClassifyThemes } from './themeClassifier';
+import { openai, generateEmbeddings as generateOpenAIEmbeddings } from './llm';
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-if (!OPENAI_API_KEY) throw new Error("Missing OpenAI API Key!");
+const UPSTASH_VECTOR_REST_URL = process.env.UPSTASH_VECTOR_REST_URL;
+const UPSTASH_VECTOR_REST_TOKEN = process.env.UPSTASH_VECTOR_REST_TOKEN;
 
-const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+if (!UPSTASH_VECTOR_REST_URL) throw new Error("Missing Upstash Vector REST URL!");
+if (!UPSTASH_VECTOR_REST_TOKEN) throw new Error("Missing Upstash Vector REST Token!");
 
-// ChromaDB connection with retry logic
-async function getChromaClient(retries = 3, delay = 1000): Promise<ChromaClient> {
-    for (let i = 0; i < retries; i++) {
-        try {
-            const client = new ChromaClient({
-                path: process.env.CHROMA_API_URL || 'http://localhost:8000'
-              });
-            // Test the connection
-            await client.heartbeat();
-            return client;
-        } catch (error) {
-            console.log(`ChromaDB connection attempt ${i + 1} failed. ${i < retries - 1 ? 'Retrying...' : ''}`);
-            if (i < retries - 1) {
-                await new Promise(resolve => setTimeout(resolve, delay));
-            } else {
-                throw new Error('Failed to connect to ChromaDB. Make sure the server is running.');
-            }
-        }
-    }
-    throw new Error('Failed to connect to ChromaDB after retries');
-}
-
-// Get ChromaDB client when needed instead of global instance
-async function getChroma() {
-    return await getChromaClient();
-}
+// Initialize Upstash Vector client
+const vectorIndex = new Index({
+    url: UPSTASH_VECTOR_REST_URL,
+    token: UPSTASH_VECTOR_REST_TOKEN
+});
 
 // Directory for storing embeddings
 const EMBEDDINGS_DIR = path.join(process.cwd(), 'embeddings');
@@ -65,10 +45,7 @@ async function generateEmbeddings(chunks: ProcessedChunk[]): Promise<EmbeddingDo
     const themeResults = await batchClassifyThemes(chunks.map(chunk => chunk.content));
     
     console.log('Generating embeddings...');
-    const embeddingResponse = await openai.embeddings.create({
-        model: "text-embedding-3-small",
-        input: chunks.map(chunk => chunk.content),
-    });
+    const embeddingResponse = await generateOpenAIEmbeddings(chunks.map(chunk => chunk.content));
 
     return chunks.map((chunk, i) => ({
         id: `${chunk.sourceFile}-${i}`,
@@ -78,19 +55,15 @@ async function generateEmbeddings(chunks: ProcessedChunk[]): Promise<EmbeddingDo
             ...chunk.metadata,
             themes: themeResults[i].themes
         },
-        embedding: embeddingResponse.data[i].embedding,
+        embedding: embeddingResponse[i],
     }));
 }
 
 // Create a reusable embedding function
 export const embeddingFunction = {
     async generate(texts: string[]): Promise<number[][]> {
-        const openai = new OpenAI();
-        const response = await openai.embeddings.create({
-            input: texts,
-            model: "text-embedding-3-small"
-        });
-        return response.data.map(item => item.embedding);
+        const response = await generateOpenAIEmbeddings(texts);
+        return response;
     }
 };
 
@@ -98,12 +71,6 @@ export const embeddingFunction = {
  * Creates or updates a vector store with processed chunks
  */
 export async function createVectorStore(filePaths: string | string[], collectionName: string) {
-    const client = await getChroma();
-    const collection = await client.getOrCreateCollection({ 
-        name: collectionName,
-        embeddingFunction
-    });
-
     // Process files and get chunks
     const chunks = await processFile(filePaths);
     console.log(`Generated ${chunks.length} chunks from ${Array.isArray(filePaths) ? filePaths.length : 1} file(s)`);
@@ -115,26 +82,41 @@ export async function createVectorStore(filePaths: string | string[], collection
     const embeddingsPath = path.join(EMBEDDINGS_DIR, `${collectionName}.json`);
     fs.writeFileSync(embeddingsPath, JSON.stringify(documents, null, 2));
 
-    // Add to ChromaDB
-    await collection.add({
-        ids: documents.map(doc => doc.id),
-        embeddings: documents.map(doc => doc.embedding),
-        metadatas: documents.map(doc => {
-            const metadata: Record<string, string | number | boolean> = {
-                sourceFile: doc.sourceFile,
-                themes: doc.metadata.themes.join(',')
-            };
-            
-            if (doc.metadata.title) metadata.title = doc.metadata.title;
-            if (doc.metadata.author) metadata.author = doc.metadata.author;
-            if (doc.metadata.chapter) metadata.chapter = doc.metadata.chapter;
-            
-            return metadata;
-        }),
-        documents: documents.map(doc => doc.content),
-    });
+    // Add to Upstash Vector
+    console.log(`Starting upload of ${documents.length} vectors to Upstash...`);
+    const batchSize = 50;
+    const batches = Math.ceil(documents.length / batchSize);
+    const startTime = Date.now();
 
-    console.log(`Successfully created vector store with ${documents.length} documents`);
+    for (let i = 0; i < documents.length; i += batchSize) {
+        const batch = documents.slice(i, i + batchSize);
+        const batchNumber = Math.floor(i / batchSize) + 1;
+        console.log(`Processing batch ${batchNumber}/${batches} (${batch.length} documents)...`);
+        
+        try {
+            await Promise.all(batch.map(doc => 
+                vectorIndex.upsert({
+                    id: doc.id,
+                    vector: doc.embedding,
+                    metadata: {
+                        content: doc.content,
+                        sourceFile: doc.sourceFile,
+                        themes: doc.metadata.themes.join(','),
+                        ...(doc.metadata.title && { title: doc.metadata.title }),
+                        ...(doc.metadata.author && { author: doc.metadata.author }),
+                        ...(doc.metadata.chapter && { chapter: doc.metadata.chapter })
+                    }
+                })
+            ));
+            console.log(`✓ Batch ${batchNumber}/${batches} uploaded successfully`);
+        } catch (error) {
+            console.error(`Error uploading batch ${batchNumber}/${batches}:`, error);
+            throw error;
+        }
+    }
+
+    const timeElapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+    console.log(`Successfully created vector store with ${documents.length} documents in ${timeElapsed}s`);
     return documents;
 }
 
@@ -142,26 +124,43 @@ export async function createVectorStore(filePaths: string | string[], collection
  * Queries the vector store for relevant chunks
  */
 export async function queryVectorStore(query: string, collectionName: string, themes?: string[]) {
-    const client = await getChroma();
-    const collection = await client.getCollection({ 
-        name: collectionName,
-        embeddingFunction
-    });
-
     // Generate query embedding
-    const queryEmbedding = await embeddingFunction.generate([query]);
+    const [queryEmbedding] = await embeddingFunction.generate([query]);
 
-    // Build where clause for theme filtering
-    const where = themes && themes.length > 0
-        ? { themes: { $in: themes } }
-        : undefined;
-
-    // Query ChromaDB
-    const results = await collection.query({
-        queryEmbeddings: queryEmbedding,
-        where,
-        nResults: 5,
+    // Query Upstash Vector
+    const results = await vectorIndex.query({
+        vector: queryEmbedding,
+        topK: 5,
+        ...(themes && themes.length > 0 && {
+            filter: `themes:${themes[0]}` // Convert to string format that Upstash expects
+        })
     });
 
-    return results;
+    return results.map(result => {
+        if (!result.metadata || typeof result.metadata !== 'object') {
+            throw new Error(`Invalid metadata in result: ${result.id}`);
+        }
+        
+        const metadata = result.metadata as {
+            content: string;
+            sourceFile: string;
+            themes: string;
+            title?: string;
+            author?: string;
+            chapter?: string;
+        };
+
+        return {
+            id: result.id,
+            score: result.score,
+            metadata: {
+                content: metadata.content,
+                sourceFile: metadata.sourceFile,
+                themes: metadata.themes.split(','),
+                ...(metadata.title && { title: metadata.title }),
+                ...(metadata.author && { author: metadata.author }),
+                ...(metadata.chapter && { chapter: metadata.chapter })
+            }
+        };
+    });
 }
