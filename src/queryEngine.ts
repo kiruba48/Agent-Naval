@@ -1,6 +1,6 @@
 import { Index } from "@upstash/vector";
 import dotenv from "dotenv";
-import { openai, GPT4, generateEmbeddings } from './llm';
+import { GPT4, openai, generateEmbeddings } from './llm';
 
 dotenv.config();
 

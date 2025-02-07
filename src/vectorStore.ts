@@ -4,7 +4,7 @@ import { processFile, ProcessedChunk } from "./processFile";
 import * as fs from 'fs';
 import * as path from 'path';
 import { batchClassifyThemes } from './themeClassifier';
-import { openai, generateEmbeddings as generateOpenAIEmbeddings } from './llm';
+import { generateEmbeddings as generateOpenAIEmbeddings } from './llm';
 
 const UPSTASH_VECTOR_REST_URL = process.env.UPSTASH_VECTOR_REST_URL;
 const UPSTASH_VECTOR_REST_TOKEN = process.env.UPSTASH_VECTOR_REST_TOKEN;

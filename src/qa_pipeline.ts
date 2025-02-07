@@ -3,6 +3,7 @@ import { generateQAPairsForChunks } from './qagenerator';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { writeJSONL } from './fileUtils';
 const __filename = fileURLToPath(import.meta.url);
 
 // Define the base Q&A pair interface
@@ -234,15 +235,18 @@ async function runQAPipeline(filePaths: string | string[]): Promise<FinalQAPair[
   const reviewCount = finalQAPairs.filter(pair => pair.requiresReview).length;
   console.log(`[QAPipeline] Quality Check: ${approvedCount} approved, ${reviewCount} flagged for review.`);
 
-  // Save the Q&A pairs to an output JSON file
-  const outputFile = path.join(process.cwd(), 'output', 'qa_pairs.json');
-  const outputDir = path.dirname(outputFile);
+  // Save final Q&A pairs
+  const outputDir = path.join(process.cwd(), 'tmp');
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
-    console.log(`[QAPipeline] Created output directory: ${outputDir}`);
   }
-  fs.writeFileSync(outputFile, JSON.stringify(finalQAPairs, null, 2));
-  console.log(`[QAPipeline] Q&A pairs saved to ${outputFile}`);
+
+  const outputPath = path.join(outputDir, 'qa_quality_test_results.jsonl');
+  writeJSONL(outputPath, finalQAPairs);
+  
+  console.log(`\n✅ Generated ${finalQAPairs.length} Q&A pairs`);
+  console.log(`✍️  ${finalQAPairs.filter(qa => qa.requiresReview).length} pairs flagged for review`);
+  console.log(`💾 Results saved to: ${outputPath}`);
 
   return finalQAPairs;
 }

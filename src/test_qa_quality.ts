@@ -5,8 +5,8 @@ import fs from 'fs';
 async function testQAQuality() {
   console.log('Starting QA quality test...');
 
-  // Use programming concepts text file for testing
-  const inputFile = path.join(process.cwd(), 'data', 'programming-concepts.txt');
+  // Use personality PDF for testing
+  const inputFile = path.join(process.cwd(), 'data', 'personality-the-body-in-society.pdf');
   console.log('Input file:', inputFile);
 
   try {
@@ -31,14 +31,14 @@ async function testQAQuality() {
     };
     
     // Ensure tmp directory exists
-    const outputPath = path.join(process.cwd(), 'tmp', 'qa_quality_test_results.json');
-    const tmpDir = path.dirname(outputPath);
-    if (!fs.existsSync(tmpDir)) {
-      fs.mkdirSync(tmpDir, { recursive: true });
+    const outputDir = path.join(process.cwd(), 'tmp');
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
     }
     
     // Save results
-    fs.writeFileSync(outputPath, JSON.stringify(summary, null, 2));
+    const outputFile = path.join(outputDir, 'qa_quality_test_results.jsonl');
+    fs.writeFileSync(outputFile, JSON.stringify(summary, null, 2));
     
     // Print summary
     console.log('\nTest Results Summary:');
@@ -46,7 +46,7 @@ async function testQAQuality() {
     console.log(`Total Q&A pairs generated: ${totalPairs}`);
     console.log(`Pairs requiring review: ${reviewRequired} (${summary.statistics.reviewPercentage})`);
     console.log(`Pairs passed quality check: ${passedQuality} (${summary.statistics.passPercentage})`);
-    console.log(`\nDetailed results saved to: ${outputPath}`);
+    console.log(`\nDetailed results saved to: ${outputFile}`);
     
   } catch (error) {
     console.error('Error during QA quality test:', error);

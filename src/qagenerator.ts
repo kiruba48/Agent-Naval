@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { generateContentHash } from './themeCache';
 import { QAPair } from './qa_pipeline';
+import { readJSONL, appendJSONL } from './fileUtils';
 
 /**
  * Generates a candidate Q&A pair from a text chunk using a language model.
@@ -11,31 +12,25 @@ import { QAPair } from './qa_pipeline';
  * @param sourceReference - The source reference string indicating where this chunk comes from.
  * @returns A promise that resolves to a Q&A object with question, answer, and sourceReference fields.
  */
-const QA_CACHE_FILE = path.join(process.cwd(), 'cache', 'qa_pairs.json');
+const QA_CACHE_FILE = path.join(process.cwd(), 'cache', 'qa_pairs.jsonl');
 
 const QA_CACHE_DIR = path.dirname(QA_CACHE_FILE);
 if (!fs.existsSync(QA_CACHE_DIR)) {
   fs.mkdirSync(QA_CACHE_DIR, { recursive: true });
 }
 
+// Initialize cache from JSONL file
 let qaCache: { [key: string]: any } = {};
-
-if (fs.existsSync(QA_CACHE_FILE)) {
-  try {
-    const data = fs.readFileSync(QA_CACHE_FILE, 'utf-8');
-    qaCache = JSON.parse(data);
-  } catch (error) {
-    console.warn('Error reading Q&A cache file, starting with empty cache:', error);
-    qaCache = {};
+const qaCacheEntries = readJSONL(QA_CACHE_FILE);
+qaCacheEntries.forEach(entry => {
+  if (entry.key && entry.value) {
+    qaCache[entry.key] = entry.value;
   }
-}
+});
 
-function saveQACache(): void {
-  try {
-    fs.writeFileSync(QA_CACHE_FILE, JSON.stringify(qaCache, null, 2));
-  } catch (error) {
-    console.error('Error saving Q&A cache:', error);
-  }
+function saveQAToCache(key: string, value: any): void {
+  qaCache[key] = value;
+  appendJSONL(QA_CACHE_FILE, { key, value });
 }
 
 export async function generateQAPair(textChunk: string, sourceReference: string): Promise<QAPair> {
@@ -83,8 +78,7 @@ Respond with only the JSON object.
     qaPair.source_reference = sourceReference;
 
     console.log(`[QAGenerator] Q&A pair successfully parsed. Saving to cache with key: ${cacheKey}`);
-    qaCache[cacheKey] = qaPair;
-    saveQACache();
+    saveQAToCache(cacheKey, qaPair);
 
     return qaPair;
   } catch (error) {
