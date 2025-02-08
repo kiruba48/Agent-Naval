@@ -50,13 +50,44 @@ async function findRelevantChunks(query: string, collectionName: string, topK = 
     }
 }
 
+export interface StructuredAnswer {
+    answer: string;                 // The main answer text
+    confidence: number;             // Confidence score between 0 and 1
+    sources: {                      // Sources used in the answer
+        content: string;
+        relevance: number;
+    }[];
+    topics: string[];              // Main topics/themes discussed in the answer
+}
+
 /**
  * Generates an answer using GPT-4 based on retrieved chunks.
  */
-export async function answerQuery(query: string, collectionName: string) {
-    const systemPrompt = `You are a helpful AI assistant answering questions about Naval Ravikant's reading list.
-    Use the following context to answer the question. If you cannot answer based on the context, say so.
-    Don't mention that you're using any specific context - just answer naturally.`;
+export async function answerQuery(
+    query: string, 
+    collectionName: string,
+    structured: boolean = false
+): Promise<string | StructuredAnswer> {
+    const systemPrompt = structured ? 
+        `You are a helpful AI assistant answering questions about Naval Ravikant's reading list.
+        Use the following context to answer the question. If you cannot answer based on the context, say so.
+        Don't mention that you're using any specific context - just answer naturally.
+        
+        You MUST return your response in the following JSON format:
+        {
+            "answer": "your detailed answer here",
+            "confidence": 0.95, // between 0 and 1, based on how confident you are in the answer
+            "sources": [
+                {
+                    "content": "relevant quote from context",
+                    "relevance": 0.9 // between 0 and 1, how relevant this source is
+                }
+            ],
+            "topics": ["topic1", "topic2"] // main topics/themes discussed
+        }` :
+        `You are a helpful AI assistant answering questions about Naval Ravikant's reading list.
+        Use the following context to answer the question. If you cannot answer based on the context, say so.
+        Don't mention that you're using any specific context - just answer naturally.`;
     
     const relevantChunks = await findRelevantChunks(query, collectionName);
     console.log("Retrieved Context:", relevantChunks.join("\n\n"));
@@ -67,10 +98,23 @@ export async function answerQuery(query: string, collectionName: string) {
             { role: "system", content: systemPrompt },
             { role: "user", content: `Use the following context to answer:\n\n${relevantChunks.join("\n\n")}\n\nQuestion: ${query}` },
         ],
+        response_format: structured ? { type: "json_object" } : undefined,
         temperature: 0.6,
         max_tokens: 500,
     });
 
-    console.log("Answer:", response.choices[0].message.content);
-    return response.choices[0].message.content;
+    const content = response.choices[0].message.content;
+    console.log("Answer:", content);
+
+    if (structured && content) {
+        try {
+            return JSON.parse(content) as StructuredAnswer;
+        } catch (error) {
+            console.error("Failed to parse structured response:", error);
+            // Fallback to unstructured response
+            return content;
+        }
+    }
+
+    return content || "";
 }

@@ -45,7 +45,7 @@ async function main() {
             const query = readlineSync.question("\n🔹 Your Question: ");
             if (query.toLowerCase() === "exit") break;
 
-            const answer = await answerQuery(query, COLLECTION_NAME);
+            const answer = await answerQuery(query, COLLECTION_NAME, true);
             console.log("\n💡 AI Response:", answer);
         }
     } catch (error) {

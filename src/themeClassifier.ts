@@ -1,4 +1,4 @@
-import { llm_client, GPT4, DEEPSEEK_V3, LLAMA_70B } from './llm';
+import { llm_client, LLAMA_70B } from './llm';
 import dotenv from "dotenv";
 import { getCachedThemes, cacheThemes } from './themeCache';
 

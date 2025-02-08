@@ -1,7 +1,26 @@
 [
   {
-    "question": "How can regular breaks and mindfulness exercises impact productivity?",
-    "answer": "Regular breaks and mindfulness exercises can improve productivity and reduce stress.",
-    "source_reference": "sample, Paragraph 1"
+    "question": "What are the four main principles of Object-Oriented Programming (OOP)?",
+    "answer": "The four main principles of OOP are encapsulation, inheritance, polymorphism, and abstraction.",
+    "source_reference": "programming-concepts, Paragraph 1",
+    "requiresReview": false
+  },
+  {
+    "question": "What are some common design patterns in software design?",
+    "answer": "Some common design patterns include Singleton, Factory, and Observer. The Singleton pattern ensures a class has only one instance, the Factory pattern provides an interface for creating objects while allowing subclasses to decide which class to instantiate, and the Observer pattern defines a one-to-many dependency between objects so that when one object changes state, all its dependents are notified.",
+    "source_reference": "programming-concepts, Paragraph 2",
+    "requiresReview": true
+  },
+  {
+    "question": "What are some performance optimization techniques mentioned in the text?",
+    "answer": "Performance optimization techniques include caching frequently accessed data, using appropriate data structures, minimizing database calls, implementing lazy loading, and optimizing algorithms for better time complexity.",
+    "source_reference": "programming-concepts, Paragraph 3",
+    "requiresReview": false
+  },
+  {
+    "question": "What are some key practices for ensuring security in programming?",
+    "answer": "Key practices for ensuring security in programming include input validation, authentication and authorization, secure data storage, protection against common vulnerabilities, and regular security updates.",
+    "source_reference": "programming-concepts, Paragraph 4",
+    "requiresReview": false
   }
 ]
