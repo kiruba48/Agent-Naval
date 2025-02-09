@@ -18,7 +18,7 @@ export interface UserProfile {
   name: string;
   preferences: {
     themes: {
-      [theme: string]: {
+      [themeId: string]: {
         strength: number;
         lastUpdated: string;
       }
@@ -28,9 +28,21 @@ export interface UserProfile {
   updated_at: string;
 }
 
+export interface Theme {
+  id: string;
+  name: string;
+  description: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export class FirebaseService {
   private userRef(uid: string): DatabaseReference {
     return ref(database, `users/${uid}`);
+  }
+
+  private themesRef(): DatabaseReference {
+    return ref(database, 'themes');
   }
 
   async createUser(email: string, password: string, name: string): Promise<UserProfile> {
@@ -89,18 +101,57 @@ export class FirebaseService {
     }
   }
 
+  async getAllThemes(): Promise<Theme[]> {
+    try {
+      const snapshot = await get(this.themesRef());
+      return snapshot.val() ? Object.values(snapshot.val()) : [];
+    } catch (error) {
+      console.error('Error getting themes:', error);
+      return [];
+    }
+  }
+
+  async addTheme(id: string, name: string, description: string): Promise<Theme> {
+    try {
+      const theme: Theme = {
+        id,
+        name,
+        description,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      await set(ref(database, `themes/${id}`), theme);
+      return theme;
+    } catch (error) {
+      console.error('Error adding theme:', error);
+      throw error;
+    }
+  }
+
   async updateUserPreferences(
     uid: string,
-    themes: { [theme: string]: { strength: number } }
+    themes: { [themeId: string]: { strength: number } }
   ): Promise<void> {
     try {
+      // Validate that all theme IDs exist
+      const availableThemes = await this.getAllThemes();
+      const availableThemeIds = availableThemes.map(theme => theme.id);
+      
+      const invalidThemes = Object.keys(themes).filter(
+        themeId => !availableThemeIds.includes(themeId)
+      );
+
+      if (invalidThemes.length > 0) {
+        throw new Error(`Invalid theme IDs: ${invalidThemes.join(', ')}`);
+      }
+
       const preferences: UserProfile['preferences'] = {
         themes: {}
       };
       
-      // Create valid Firebase keys
-      Object.entries(themes).forEach(([theme, { strength }]) => {
-        preferences.themes[theme.replace(/[.#$\/\[\]]/g, '_')] = {
+      Object.entries(themes).forEach(([themeId, { strength }]) => {
+        preferences.themes[themeId] = {
           strength,
           lastUpdated: new Date().toISOString()
         };
