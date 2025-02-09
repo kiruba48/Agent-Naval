@@ -11,6 +11,8 @@
 - When using ChromaDB's embedding function, it must be provided as an object with a `generate` method that implements the `IEmbeddingFunction` interface, not as a standalone function
 - When using Upstash Vector's query method, pass the collection/namespace as a separate parameter to the query method rather than including it in the query options object
 - When using Upstash Vector's query method, pass collection names as a namespace object ({ namespace: collectionName }) rather than directly as a string
+- When working with Upstash Vector search results, the content field is nested inside the metadata object (access via result.metadata.content)
+- When querying Upstash Vector, set includeMetadata: true to get metadata fields in query results
 
 # Scratchpad
 

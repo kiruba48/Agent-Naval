@@ -96,6 +96,24 @@ export async function createVectorStore(filePaths: string | string[], collection
     const embeddingsPath = path.join(EMBEDDINGS_DIR, `${collectionName}.json`);
     fs.writeFileSync(embeddingsPath, JSON.stringify(documents, null, 2));
 
+    // Create vector store entries
+    const entries = documents.map(doc => {
+        const entry = {
+            id: doc.id,
+            vector: doc.embedding,
+            metadata: {
+                content: doc.content,
+                sourceFile: doc.sourceFile,
+                themes: doc.metadata.themes.join(','), // Convert array to comma-separated string
+                ...(doc.metadata.title && { title: doc.metadata.title }),
+                ...(doc.metadata.author && { author: doc.metadata.author }),
+                ...(doc.metadata.chapter && { chapter: doc.metadata.chapter })
+            }
+        };
+        console.log('Creating vector store entry:', JSON.stringify(entry, null, 2));
+        return entry;
+    });
+
     // Add to Upstash Vector
     console.log(`Starting upload of ${documents.length} vectors to Upstash...`);
     const batchSize = 50;
@@ -103,24 +121,13 @@ export async function createVectorStore(filePaths: string | string[], collection
     const startTime = Date.now();
 
     for (let i = 0; i < documents.length; i += batchSize) {
-        const batch = documents.slice(i, i + batchSize);
+        const batch = entries.slice(i, i + batchSize);
         const batchNumber = Math.floor(i / batchSize) + 1;
         console.log(`Processing batch ${batchNumber}/${batches} (${batch.length} documents)...`);
         
         try {
             await Promise.all(batch.map(doc => 
-                vectorIndex.upsert({
-                    id: doc.id,
-                    vector: doc.embedding,
-                    metadata: {
-                        content: doc.content,
-                        sourceFile: doc.sourceFile,
-                        themes: doc.metadata.themes.join(','),
-                        ...(doc.metadata.title && { title: doc.metadata.title }),
-                        ...(doc.metadata.author && { author: doc.metadata.author }),
-                        ...(doc.metadata.chapter && { chapter: doc.metadata.chapter })
-                    }
-                })
+                vectorIndex.upsert(doc)
             ));
             console.log(`✓ Batch ${batchNumber}/${batches} uploaded successfully`);
         } catch (error) {
@@ -145,13 +152,17 @@ export async function queryVectorStore(query: string, collectionName: string, th
     const results = await vectorIndex.query({
         vector: queryEmbedding,
         topK: 5,
+        includeMetadata: true, // Request metadata to be included in results
         ...(themes && themes.length > 0 && {
             filter: `themes:${themes[0]}` // Convert to string format that Upstash expects
         })
     });
 
+    console.log('Raw results from Upstash:', JSON.stringify(results, null, 2));
+
     return results.map(result => {
         if (!result.metadata || typeof result.metadata !== 'object') {
+            console.error('Invalid metadata for result:', JSON.stringify(result, null, 2));
             throw new Error(`Invalid metadata in result: ${result.id}`);
         }
         
@@ -164,13 +175,19 @@ export async function queryVectorStore(query: string, collectionName: string, th
             chapter?: string;
         };
 
+        // Validate required metadata fields
+        if (!metadata.content || !metadata.sourceFile || !metadata.themes) {
+            console.error('Missing required metadata fields:', metadata);
+            throw new Error(`Missing required metadata fields in result: ${result.id}`);
+        }
+
         return {
             id: result.id,
             score: result.score,
             metadata: {
                 content: metadata.content,
                 sourceFile: metadata.sourceFile,
-                themes: metadata.themes.split(','),
+                themes: metadata.themes.split(',').map(t => t.trim()),
                 ...(metadata.title && { title: metadata.title }),
                 ...(metadata.author && { author: metadata.author }),
                 ...(metadata.chapter && { chapter: metadata.chapter })

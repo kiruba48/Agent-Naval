@@ -1,6 +1,6 @@
 {
   "21ee8988d6821897470e557ab2b9754b": {
-    "timestamp": 1738928917173,
+    "timestamp": 1739103116681,
     "result": {
       "themes": [
         "philosophy",
@@ -8,275 +8,12 @@
       ],
       "confidence": {
         "philosophy": 0.9,
-        "personal-growth": 0.7
-      }
-    }
-  },
-  "42a52c19d85cece189eb05f5ed7bca4f": {
-    "timestamp": 1738928925438,
-    "result": {
-      "themes": [
-        "philosophy",
-        "personal-growth",
-        "decision-making"
-      ],
-      "confidence": {
-        "philosophy": 0.9,
-        "personal-growth": 0.8,
-        "decision-making": 0.7
-      }
-    }
-  },
-  "d13a3e680fadaf4047910e274d3ec4a0": {
-    "timestamp": 1738928934625,
-    "result": {
-      "themes": [
-        "philosophy",
-        "personal-growth",
-        "decision-making"
-      ],
-      "confidence": {
-        "philosophy": 0.9,
-        "personal-growth": 0.7,
-        "decision-making": 0.6
-      }
-    }
-  },
-  "98c4760c39b5adab578464e9c5d9a09e": {
-    "timestamp": 1738928940735,
-    "result": {
-      "themes": [
-        "philosophy",
-        "personal-growth"
-      ],
-      "confidence": {
-        "philosophy": 0.7,
         "personal-growth": 0.6
-      }
-    }
-  },
-  "c9b4c4158db317950a7c6d8f052c5e74": {
-    "timestamp": 1738928957331,
-    "result": {
-      "themes": [
-        "philosophy",
-        "health-wellness",
-        "relationships"
-      ],
-      "confidence": {
-        "philosophy": 0.9,
-        "health-wellness": 0.7,
-        "relationships": 0.6
-      }
-    }
-  },
-  "b7fd4ec0c9954acc56c395f0d5d31b77": {
-    "timestamp": 1738928964168,
-    "result": {
-      "themes": [
-        "philosophy",
-        "health-wellness"
-      ],
-      "confidence": {
-        "philosophy": 0.9,
-        "health-wellness": 0.7
-      }
-    }
-  },
-  "e20ca5e26eb5b75c45dfad01403530d0": {
-    "timestamp": 1738928975601,
-    "result": {
-      "themes": [
-        "philosophy",
-        "personal-growth",
-        "health-wellness"
-      ],
-      "confidence": {
-        "philosophy": 0.9,
-        "personal-growth": 0.7,
-        "health-wellness": 0.6
-      }
-    }
-  },
-  "93f06f30f681243fb609a0d9226254b9": {
-    "timestamp": 1738928982418,
-    "result": {
-      "themes": [
-        "philosophy",
-        "health-wellness"
-      ],
-      "confidence": {
-        "philosophy": 0.9,
-        "health-wellness": 0.7
-      }
-    }
-  },
-  "ce22fb9d08e821e3dc01062a1bbc8f24": {
-    "timestamp": 1738928988558,
-    "result": {
-      "themes": [
-        "philosophy",
-        "personal-growth"
-      ],
-      "confidence": {
-        "philosophy": 0.9,
-        "personal-growth": 0.7
-      }
-    }
-  },
-  "544050517512931736cb026eec62e4ce": {
-    "timestamp": 1738928995735,
-    "result": {
-      "themes": [
-        "philosophy",
-        "personal-growth",
-        "decision-making"
-      ],
-      "confidence": {
-        "philosophy": 0.9,
-        "personal-growth": 0.8,
-        "decision-making": 0.7
-      }
-    }
-  },
-  "55bfa1eaea95f6398e2b0378f619e92d": {
-    "timestamp": 1738929011737,
-    "result": {
-      "themes": [
-        "personal-growth",
-        "relationships",
-        "decision-making"
-      ],
-      "confidence": {
-        "personal-growth": 0.9,
-        "relationships": 0.8,
-        "decision-making": 0.7
-      }
-    }
-  },
-  "4767835a2435557aa94d62ffc3c57025": {
-    "timestamp": 1738929021040,
-    "result": {
-      "themes": [
-        "entrepreneurship",
-        "personal-growth",
-        "decision-making"
-      ],
-      "confidence": {
-        "entrepreneurship": 0.9,
-        "personal-growth": 0.7,
-        "decision-making": 0.8
-      }
-    }
-  },
-  "8f5bde5cd0ab828d11bcff5d6616bbc7": {
-    "timestamp": 1738929028229,
-    "result": {
-      "themes": [
-        "decision-making",
-        "personal-growth",
-        "philosophy"
-      ],
-      "confidence": {
-        "decision-making": 0.8,
-        "personal-growth": 0.7,
-        "philosophy": 0.6
-      }
-    }
-  },
-  "aaa6473935e37c336b4f5fd18fe849b5": {
-    "timestamp": 1738929034612,
-    "result": {
-      "themes": [
-        "personal-growth",
-        "relationships"
-      ],
-      "confidence": {
-        "personal-growth": 0.7,
-        "relationships": 0.8
-      }
-    }
-  },
-  "df0b805ecf32c2a2cc0bc4b4e1096772": {
-    "timestamp": 1738929080721,
-    "result": {
-      "themes": [
-        "personal-growth",
-        "decision-making"
-      ],
-      "confidence": {
-        "personal-growth": 0.7,
-        "decision-making": 0.6
-      }
-    }
-  },
-  "626930c8ceb6fd954865806fea24c9cd": {
-    "timestamp": 1738929090649,
-    "result": {
-      "themes": [
-        "personal-growth",
-        "decision-making"
-      ],
-      "confidence": {
-        "personal-growth": 0.9,
-        "decision-making": 0.8
-      }
-    }
-  },
-  "b432af7e865902e86d7a2c5fa938f32b": {
-    "timestamp": 1738929097945,
-    "result": {
-      "themes": [
-        "philosophy",
-        "personal-growth"
-      ],
-      "confidence": {
-        "philosophy": 0.9,
-        "personal-growth": 0.7
-      }
-    }
-  },
-  "a61ff3ae891e5d5963e9ceb1f95832a4": {
-    "timestamp": 1738929104663,
-    "result": {
-      "themes": [
-        "personal-growth",
-        "philosophy"
-      ],
-      "confidence": {
-        "personal-growth": 0.8,
-        "philosophy": 0.7
-      }
-    }
-  },
-  "b4b74482936aa52b3a55340134334487": {
-    "timestamp": 1738929111730,
-    "result": {
-      "themes": [
-        "philosophy",
-        "personal-growth"
-      ],
-      "confidence": {
-        "philosophy": 0.9,
-        "personal-growth": 0.7
-      }
-    }
-  },
-  "7a6943b0ba23eaca61da88314ba2d84a": {
-    "timestamp": 1738929122790,
-    "result": {
-      "themes": [
-        "philosophy",
-        "personal-growth"
-      ],
-      "confidence": {
-        "philosophy": 0.9,
-        "personal-growth": 0.7
       }
     }
   },
   "2d7c6a38b02707fee95bce5cfe4b4c07": {
-    "timestamp": 1738933062753,
+    "timestamp": 1739103116684,
     "result": {
       "themes": [
         "philosophy",
@@ -288,8 +25,21 @@
       }
     }
   },
+  "42a52c19d85cece189eb05f5ed7bca4f": {
+    "timestamp": 1739103118899,
+    "result": {
+      "themes": [
+        "philosophy",
+        "personal-growth"
+      ],
+      "confidence": {
+        "philosophy": 0.9,
+        "personal-growth": 0.8
+      }
+    }
+  },
   "e6a0d7ad09d18be96fa32c5ff149e581": {
-    "timestamp": 1738933064822,
+    "timestamp": 1739103118902,
     "result": {
       "themes": [
         "philosophy",
@@ -302,7 +52,7 @@
     }
   },
   "fc222e3751137bfaa40cdfcdad316af6": {
-    "timestamp": 1738933066572,
+    "timestamp": 1739103120969,
     "result": {
       "themes": [
         "personal-growth",
@@ -314,21 +64,62 @@
       }
     }
   },
+  "d13a3e680fadaf4047910e274d3ec4a0": {
+    "timestamp": 1739103121008,
+    "result": {
+      "themes": [
+        "philosophy",
+        "personal-growth"
+      ],
+      "confidence": {
+        "philosophy": 0.9,
+        "personal-growth": 0.6
+      }
+    }
+  },
+  "98c4760c39b5adab578464e9c5d9a09e": {
+    "timestamp": 1739103123118,
+    "result": {
+      "themes": [
+        "philosophy",
+        "personal-growth"
+      ],
+      "confidence": {
+        "philosophy": 0.9,
+        "personal-growth": 0.6
+      }
+    }
+  },
   "d8dba9e49c9a89906462172328c1a32c": {
-    "timestamp": 1738933068730,
+    "timestamp": 1739103123503,
     "result": {
       "themes": [
         "personal-growth",
-        "relationships"
+        "relationships",
+        "philosophy"
       ],
       "confidence": {
         "personal-growth": 0.9,
-        "relationships": 0.6
+        "relationships": 0.8,
+        "philosophy": 0.7
+      }
+    }
+  },
+  "c9b4c4158db317950a7c6d8f052c5e74": {
+    "timestamp": 1739103125236,
+    "result": {
+      "themes": [
+        "health-wellness",
+        "decision-making"
+      ],
+      "confidence": {
+        "health-wellness": 0.9,
+        "decision-making": 0.6
       }
     }
   },
   "21707a8df550db7db2bc41bf86d5f4b9": {
-    "timestamp": 1738933070617,
+    "timestamp": 1739103125425,
     "result": {
       "themes": [
         "philosophy",
@@ -340,8 +131,21 @@
       }
     }
   },
+  "b7fd4ec0c9954acc56c395f0d5d31b77": {
+    "timestamp": 1739103127417,
+    "result": {
+      "themes": [
+        "philosophy",
+        "health-wellness"
+      ],
+      "confidence": {
+        "philosophy": 0.9,
+        "health-wellness": 0.6
+      }
+    }
+  },
   "db47f46db57e945db0208b7fec1d490f": {
-    "timestamp": 1738933072481,
+    "timestamp": 1739103127419,
     "result": {
       "themes": [
         "decision-making",
@@ -354,7 +158,7 @@
     }
   },
   "cf37e876d2ee486433d021713dad45a3": {
-    "timestamp": 1738933074321,
+    "timestamp": 1739103129466,
     "result": {
       "themes": [
         "decision-making",
@@ -363,11 +167,24 @@
       "confidence": {
         "decision-making": 0.9,
         "leadership": 0.8
+      }
+    }
+  },
+  "e20ca5e26eb5b75c45dfad01403530d0": {
+    "timestamp": 1739103129661,
+    "result": {
+      "themes": [
+        "philosophy",
+        "health-wellness"
+      ],
+      "confidence": {
+        "philosophy": 0.9,
+        "health-wellness": 0.6
       }
     }
   },
   "c892ab505ad2460930a05c8319cd8d06": {
-    "timestamp": 1738933076142,
+    "timestamp": 1739103131309,
     "result": {
       "themes": [
         "decision-making",
@@ -379,8 +196,21 @@
       }
     }
   },
+  "93f06f30f681243fb609a0d9226254b9": {
+    "timestamp": 1739103131832,
+    "result": {
+      "themes": [
+        "philosophy",
+        "health-wellness"
+      ],
+      "confidence": {
+        "philosophy": 0.9,
+        "health-wellness": 0.6
+      }
+    }
+  },
   "887730b64c2b20afe8b60498e0292810": {
-    "timestamp": 1738933078082,
+    "timestamp": 1739103133357,
     "result": {
       "themes": [
         "philosophy",
@@ -392,8 +222,21 @@
       }
     }
   },
+  "ce22fb9d08e821e3dc01062a1bbc8f24": {
+    "timestamp": 1739103133947,
+    "result": {
+      "themes": [
+        "philosophy",
+        "personal-growth"
+      ],
+      "confidence": {
+        "philosophy": 0.9,
+        "personal-growth": 0.6
+      }
+    }
+  },
   "f061598b16f545dece6f36e18d0e9f38": {
-    "timestamp": 1738933080046,
+    "timestamp": 1739103135235,
     "result": {
       "themes": [
         "relationships",
@@ -405,8 +248,23 @@
       }
     }
   },
+  "544050517512931736cb026eec62e4ce": {
+    "timestamp": 1739103136675,
+    "result": {
+      "themes": [
+        "philosophy",
+        "personal-growth",
+        "happiness"
+      ],
+      "confidence": {
+        "philosophy": 0.9,
+        "personal-growth": 0.8,
+        "happiness": 0.6
+      }
+    }
+  },
   "18781be12b687b2ba46169a54fc45fca": {
-    "timestamp": 1738933082016,
+    "timestamp": 1739103137514,
     "result": {
       "themes": [
         "philosophy",
@@ -418,8 +276,23 @@
       }
     }
   },
+  "55bfa1eaea95f6398e2b0378f619e92d": {
+    "timestamp": 1739103139324,
+    "result": {
+      "themes": [
+        "personal-growth",
+        "philosophy",
+        "decision-making"
+      ],
+      "confidence": {
+        "personal-growth": 0.9,
+        "philosophy": 0.8,
+        "decision-making": 0.6
+      }
+    }
+  },
   "5d143ac389f163485f0334ec3c8f804f": {
-    "timestamp": 1738933083870,
+    "timestamp": 1739103139396,
     "result": {
       "themes": [
         "decision-making",
@@ -432,7 +305,7 @@
     }
   },
   "506a823f8cc12b5641a5c90b21270c56": {
-    "timestamp": 1738933085870,
+    "timestamp": 1739103141340,
     "result": {
       "themes": [
         "entrepreneurship",
@@ -441,11 +314,24 @@
       "confidence": {
         "entrepreneurship": 0.9,
         "decision-making": 0.6
+      }
+    }
+  },
+  "4767835a2435557aa94d62ffc3c57025": {
+    "timestamp": 1739103141895,
+    "result": {
+      "themes": [
+        "decision-making",
+        "entrepreneurship"
+      ],
+      "confidence": {
+        "decision-making": 0.9,
+        "entrepreneurship": 0.8
       }
     }
   },
   "88844793565b7afc0b9ecc42cfd4bfa9": {
-    "timestamp": 1738933087816,
+    "timestamp": 1739103143350,
     "result": {
       "themes": [
         "entrepreneurship",
@@ -454,11 +340,24 @@
       "confidence": {
         "entrepreneurship": 0.9,
         "wealth-building": 0.8
+      }
+    }
+  },
+  "8f5bde5cd0ab828d11bcff5d6616bbc7": {
+    "timestamp": 1739103144112,
+    "result": {
+      "themes": [
+        "personal-growth",
+        "philosophy"
+      ],
+      "confidence": {
+        "personal-growth": 0.9,
+        "philosophy": 0.8
       }
     }
   },
   "ca838ed158e95a40126211d811804f4e": {
-    "timestamp": 1738933089831,
+    "timestamp": 1739103145543,
     "result": {
       "themes": [
         "entrepreneurship",
@@ -470,8 +369,21 @@
       }
     }
   },
+  "aaa6473935e37c336b4f5fd18fe849b5": {
+    "timestamp": 1739103146156,
+    "result": {
+      "themes": [
+        "relationships",
+        "personal-growth"
+      ],
+      "confidence": {
+        "relationships": 0.9,
+        "personal-growth": 0.6
+      }
+    }
+  },
   "d6094d4639e99e3ab1323a846d4d311a": {
-    "timestamp": 1738933092125,
+    "timestamp": 1739103147669,
     "result": {
       "themes": [
         "entrepreneurship",
@@ -483,8 +395,21 @@
       }
     }
   },
+  "df0b805ecf32c2a2cc0bc4b4e1096772": {
+    "timestamp": 1739103148204,
+    "result": {
+      "themes": [
+        "personal-growth",
+        "relationships"
+      ],
+      "confidence": {
+        "personal-growth": 0.9,
+        "relationships": 0.8
+      }
+    }
+  },
   "9ca5a451e00df610d37fe721f05ae4d3": {
-    "timestamp": 1738933094164,
+    "timestamp": 1739103149732,
     "result": {
       "themes": [
         "entrepreneurship",
@@ -496,8 +421,73 @@
       }
     }
   },
+  "626930c8ceb6fd954865806fea24c9cd": {
+    "timestamp": 1739103150229,
+    "result": {
+      "themes": [
+        "personal-growth",
+        "decision-making"
+      ],
+      "confidence": {
+        "personal-growth": 0.9,
+        "decision-making": 0.8
+      }
+    }
+  },
   "8fdf923a02dd82a89d940fafb2bcc9f6": {
-    "timestamp": 1738933096258,
+    "timestamp": 1739103151749,
+    "result": {
+      "themes": [
+        "philosophy",
+        "personal-growth"
+      ],
+      "confidence": {
+        "philosophy": 0.9,
+        "personal-growth": 0.6
+      }
+    }
+  },
+  "b432af7e865902e86d7a2c5fa938f32b": {
+    "timestamp": 1739103152396,
+    "result": {
+      "themes": [
+        "philosophy",
+        "personal-growth"
+      ],
+      "confidence": {
+        "philosophy": 0.9,
+        "personal-growth": 0.6
+      }
+    }
+  },
+  "a61ff3ae891e5d5963e9ceb1f95832a4": {
+    "timestamp": 1739103154455,
+    "result": {
+      "themes": [
+        "philosophy",
+        "personal-growth"
+      ],
+      "confidence": {
+        "philosophy": 0.9,
+        "personal-growth": 0.8
+      }
+    }
+  },
+  "b4b74482936aa52b3a55340134334487": {
+    "timestamp": 1739103156856,
+    "result": {
+      "themes": [
+        "philosophy",
+        "personal-growth"
+      ],
+      "confidence": {
+        "philosophy": 0.9,
+        "personal-growth": 0.6
+      }
+    }
+  },
+  "7a6943b0ba23eaca61da88314ba2d84a": {
+    "timestamp": 1739103159145,
     "result": {
       "themes": [
         "philosophy",

@@ -46,7 +46,19 @@ async function main() {
             if (query.toLowerCase() === "exit") break;
 
             const answer = await answerQuery(query, COLLECTION_NAME, true);
-            console.log("\n💡 AI Response:", answer);
+            if (typeof answer === 'string') {
+                console.log("\n💡 AI Response:", answer);
+            } else {
+                console.log("\n💡 AI Response:", answer.answer);
+                console.log("🎯 Confidence:", answer.confidence);
+                console.log("📚 Topics:", answer.topics.join(", "));
+                if (answer.sources.length > 0) {
+                    console.log("\n📖 Key Sources:");
+                    answer.sources.forEach(source => {
+                        console.log(`  • [${Math.round(source.relevance * 100)}% relevant] ${source.content}`);
+                    });
+                }
+            }
         }
     } catch (error) {
         console.error("Error in main:", error);
