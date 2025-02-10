@@ -1,0 +1,50 @@
+{
+  "rules": {
+    "conversations": {
+      "$conversationId": {
+        ".read": "auth != null && data.child('metadata/userId').val() === auth.uid",
+        
+        ".write": "auth != null && (!data.exists() || data.child('metadata/userId').val() === auth.uid)",
+        
+        ".validate": "newData.hasChildren(['metadata', 'messages'])",
+        
+        "metadata": {
+          ".validate": "newData.hasChildren(['userId', 'status', 'startTime', 'lastActivity', 'messageCount'])",
+          "userId": {
+            ".validate": "newData.isString() && newData.val() === auth.uid"
+          },
+          "status": {
+            ".validate": "newData.isString() && (newData.val() === 'active' || newData.val() === 'completed')"
+          },
+          "startTime": {
+            ".validate": "newData.isNumber()"
+          },
+          "lastActivity": {
+            ".validate": "newData.isNumber()"
+          },
+          "messageCount": {
+            ".validate": "newData.isNumber() && newData.val() >= 0"
+          }
+        },
+        
+        "messages": {
+          "$messageId": {
+            ".validate": "!data.exists() && newData.hasChildren(['role', 'content', 'timestamp']) && (newData.child('role').val() === 'user' || newData.child('role').val() === 'assistant')"
+          }
+        },
+        
+        "topics": {
+          "$topicId": {
+            ".validate": "newData.hasChildren(['startMessageId', 'themes', 'messageCount', 'status', 'timestamp'])"
+          }
+        },
+        
+        "summaries": {
+          "$summaryId": {
+            ".validate": "newData.hasChildren(['level', 'content', 'themes', 'timestamp'])"
+          }
+        }
+      }
+    }
+  }
+}

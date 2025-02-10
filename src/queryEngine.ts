@@ -87,7 +87,7 @@ export async function answerQuery(
             { role: "user", content: `Use the following context to answer:\n\n${relevantChunks.join("\n\n")}\n\nQuestion: ${query}` },
         ],
         response_format: structured ? { type: "json_object" } : undefined,
-        temperature: 0.6,
+        temperature: 0.2,
         max_tokens: 500,
     });
 
