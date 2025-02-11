@@ -11,6 +11,12 @@ import {
     CONVERSATION_STATUS,
     DEFAULT_CONVERSATION_CONFIG 
 } from '../constants/config';
+import { Timestamp } from 'firebase/firestore';
+
+type FirebaseMetadata = Omit<ConversationMetadata, 'startTime' | 'lastActivity'> & {
+    startTime: Timestamp;
+    lastActivity: Timestamp;
+};
 
 /**
  * Service for managing conversations in Firebase
@@ -111,12 +117,64 @@ class ConversationService extends BaseService {
     }
 
     /**
-     * Get conversation metadata
+     * Check if a conversation exists
      */
-    async getMetadata(conversationId: string): Promise<ConversationMetadata | null> {
-        return this.getData<ConversationMetadata>(
+    async exists(conversationId: string): Promise<boolean> {
+        const conversationRef = this.getConversationPath(conversationId);
+        const snapshot = await this.getData(conversationRef);
+        return snapshot !== null;
+    }
+
+    /**
+     * Get conversation metadata
+     * @throws {Error} if conversation doesn't exist
+     */
+    async getMetadata(conversationId: string): Promise<ConversationMetadata> {
+        const exists = await this.exists(conversationId);
+        if (!exists) {
+            throw new Error(`Conversation ${conversationId} not found`);
+        }
+
+        const metadata = await this.getData<FirebaseMetadata>(
             this.getConversationPath(conversationId, FIREBASE_PATHS.metadata)
         );
+
+        if (!metadata) {
+            // This should never happen if exists() returned true
+            throw new Error(`Metadata corrupted for conversation ${conversationId}`);
+        }
+
+        // Convert Firestore timestamps to JavaScript Dates
+        return {
+            ...metadata,
+            startTime: metadata.startTime.toDate(),
+            lastActivity: metadata.lastActivity.toDate()
+        };
+    }
+
+    /**
+     * Get a range of messages from a conversation
+     */
+    async getMessageRange(
+        conversationId: string,
+        startIndex: number,
+        endIndex: number
+    ): Promise<Message[]> {
+        const messages = await this.getData(
+            this.getConversationPath(conversationId, FIREBASE_PATHS.messages)
+        );
+
+        if (!messages) {
+            return [];
+        }
+
+        // Convert to array and sort by timestamp
+        const messageArray = Object.entries(messages)
+            .map(([id, msg]) => ({ ...msg, id }))
+            .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+
+        // Get the specified range
+        return messageArray.slice(startIndex, endIndex);
     }
 
     /**
@@ -132,11 +190,34 @@ class ConversationService extends BaseService {
         );
     }
 
+    /**
+     * Update conversation metadata
+     */
+    async updateMetadata(
+        conversationId: string,
+        updates: Partial<ConversationMetadata>
+    ): Promise<void> {
+        // Create a new object without date fields first
+        const { startTime, lastActivity, ...otherUpdates } = updates;
+        
+        // Then construct firebaseUpdates with converted Timestamps
+        const firebaseUpdates: Partial<FirebaseMetadata> = {
+            ...otherUpdates,
+            ...(startTime && { startTime: Timestamp.fromDate(startTime) }),
+            ...(lastActivity && { lastActivity: Timestamp.fromDate(lastActivity) })
+        };
+
+        await this.updateData(
+            this.getConversationPath(conversationId, FIREBASE_PATHS.metadata),
+            firebaseUpdates
+        );
+    }
+
     private async getMessageCount(conversationId: string): Promise<number> {
         const metadata = await this.getMetadata(conversationId);
-        return metadata?.messageCount || 0;
+        return metadata.messageCount;
     }
 }
 
-// Export singleton instance
+// Export only the singleton instance
 export const conversationService = ConversationService.getInstance();

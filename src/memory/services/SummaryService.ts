@@ -131,5 +131,5 @@ class SummaryService extends BaseService {
     }
 }
 
-// Export singleton instance
+// Export only the singleton instance
 export const summaryService = SummaryService.getInstance();
