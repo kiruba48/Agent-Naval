@@ -6,11 +6,19 @@
  * Base types for creation of entities
  */
 export interface CreateMessage {
-    role: 'user' | 'assistant';
+    role: 'user' | 'assistant' | 'system';
     content: string;
     timestamp: Date;
     themes?: string[];
     embedding?: number[];
+    toolCalls?: Array<{
+        id: string;
+        function: {
+            name: string;
+            arguments: string;
+        };
+    }>;
+    toolCallId?: string;
 }
 
 export interface CreateSummary {

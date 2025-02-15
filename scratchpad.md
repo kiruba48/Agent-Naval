@@ -23,6 +23,11 @@
   * Required fields: { vector: number[], topK: number }
   * Optional fields: includeMetadata, filter, namespace
   * Don't pass vector and options separately like query(vector, options)
+- When implementing tools:
+  * Use the root types.ts for ToolFn interface
+  * Keep tool definition and implementation separate
+  * Match response schema exactly with the underlying service (e.g., vectorStore)
+  * Use z.infer for type inference from Zod schemas
 
 # Scratchpad
 

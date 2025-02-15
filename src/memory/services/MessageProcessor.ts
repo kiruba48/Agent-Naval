@@ -9,6 +9,7 @@ import {
     MessageOperation,
     MessageProcessingErrorType
 } from '../types/message';
+import { CreateMessage, Message } from '../types';
 
 /**
  * Service for processing messages and managing conversation summaries
@@ -107,40 +108,90 @@ class MessageProcessor extends BaseService {
     }
 
     /**
+     * Add a single message to the conversation
+     */
+    public async addMessage(
+        conversationId: string,
+        message: CreateMessage
+    ): Promise<Message> {
+        // Get conversation metadata (will throw if conversation doesn't exist)
+        const metadata = await this.withErrorHandling(
+            () => this.conversationService.getMetadata(conversationId),
+            MessageOperation.GET_METADATA
+        );
+
+        // Store message
+        const storedMessage = await this.withErrorHandling(
+            () => this.conversationService.addMessage(conversationId, message),
+            MessageOperation.STORE_MESSAGE
+        );
+
+        // Update message count
+        const newCount = metadata.messageCount + 1;
+        await this.updateConversationMetadata(conversationId, newCount);
+
+        // Trigger summary generation in background if needed
+        if (this.shouldGenerateSummary(newCount)) {
+            this.triggerSummaryGeneration(conversationId, newCount)
+                .catch(error => console.error('Background summary generation failed:', error));
+        }
+
+        return storedMessage;
+    }
+
+    /**
+     * Get messages for summary generation, handling tool calls appropriately
+     */
+    private async getMessagesForSummary(conversationId: string): Promise<Message[]> {
+        // Get last 10 messages (5 pairs)
+        const messages = await this.conversationService.getLastMessages(conversationId, 10);
+        
+        // If the last message has tool calls, get the next message which will be the tool response
+        const lastMessage = messages[messages.length - 1];
+        // @ts-ignore - handle both snake_case from LLM and camelCase from our storage
+        if (lastMessage?.role === 'assistant' && (lastMessage.tool_calls || lastMessage.toolCalls)) {
+            // Get one more message to include the tool response
+            const extraContext = await this.conversationService.getLastMessages(
+                conversationId,
+                11  // Get 11 to include the tool response
+            );
+            
+            // Return the extra message if we found it
+            return extraContext.length > 10 ? extraContext.slice(-11) : messages;
+        }
+
+        return messages;
+    }
+
+    /**
      * Trigger summary generation as a background task
      */
     private async triggerSummaryGeneration(
         conversationId: string,
-        currentMessageCount: number
+        messageCount: number
     ): Promise<void> {
         try {
-            // Calculate the range for this summary chunk
-            const chunkSize = this.config.summaryChunkSize;
-            const startIndex = currentMessageCount - chunkSize;
-            const endIndex = currentMessageCount;
+            // Get messages including extra context if needed
+            const messages = await this.getMessagesForSummary(conversationId);
+            
+            // Extract themes and generate summary
+            const themes = messages.reduce<string[]>((acc, msg) => {
+                if (msg.themes) {
+                    acc.push(...msg.themes);
+                }
+                return acc;
+            }, []);
 
-            // Get messages for this chunk
-            const messages = await this.withErrorHandling(async () => {
-                return await this.conversationService.getMessageRange(
-                    conversationId,
-                    startIndex,
-                    endIndex
-                );
-            }, MessageOperation.GENERATE_SUMMARY);
-
-            if (!messages || messages.length === 0) {
-                throw new Error('No messages found for summary generation');
-            }
-
-            // Generate summary using SummaryService
-            await this.withErrorHandling(async () => {
-                await this.summaryService.createSummary(
-                    conversationId,
-                    'recent',
-                    messages.map(m => m.content).join('\n'),
-                    [] // themes will be added later
-                );
-            }, MessageOperation.GENERATE_SUMMARY);
+            // Create the summary
+            await this.summaryService.createSummary(
+                conversationId,
+                'recent',
+                JSON.stringify(messages.map(m => ({
+                    role: m.role,
+                    content: m.content
+                }))),
+                Array.from(new Set(themes))  // Deduplicate themes
+            );
 
         } catch (error) {
             console.error('Error generating summary:', error);
