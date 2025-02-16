@@ -3,6 +3,7 @@ import { createVectorStore } from "./src/vectorStore";
 import { answerQuery } from "./src/queryEngine";
 import { handleAuthFlow } from "./src/auth/authFlow";
 import { firebaseService } from "./src/firebase/service";
+import { conversationService } from "./src/memory/services/ConversationService"; 
 import { User } from "firebase/auth";
 import 'dotenv/config'
 import * as fs from 'fs';
@@ -53,6 +54,11 @@ async function main() {
         if (!process.argv.includes("--skip-setup")) {
             await setup();
         }
+
+        // Create a new conversation session
+        const conversationSession = await conversationService.createSession(currentUser.uid);
+        console.log(`\n🔄 Created new conversation session: ${conversationSession.id}`);
+
         console.log("\n💬 Naval RAG Chatbot Ready! Ask a question or type 'exit' to quit.");
         console.log("Commands:");
         console.log("  • exit - Quit the application");
@@ -65,6 +71,8 @@ async function main() {
 
             if (command === "exit") {
                 console.log("\n👋 Signing out and exiting...");
+                // Complete the conversation session before exiting
+                await conversationService.completeSession(conversationSession.id);
                 await firebaseService.signOut();
                 console.log("✅ Successfully signed out!");
                 console.log("Exiting application...");
@@ -72,6 +80,8 @@ async function main() {
             }
             
             if (command === "logout") {
+                // Complete the conversation session before logging out
+                await conversationService.completeSession(conversationSession.id);
                 await firebaseService.signOut();
                 console.log("\n👋 Signed out successfully!");
                 console.log("Exiting application...");
@@ -83,7 +93,7 @@ async function main() {
                 continue;
             }
 
-            const answer = await answerQuery(query, COLLECTION_NAME, true);
+            const answer = await answerQuery(query, conversationSession.id, true);
             if (typeof answer === 'string') {
                 console.log("\n💡 AI Response:", answer);
             } else {

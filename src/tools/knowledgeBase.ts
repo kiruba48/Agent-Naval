@@ -23,9 +23,10 @@ const KnowledgeQueryResponse = z.object({
 
 export const knowledgeBaseToolDefinition = {
     name: 'queryKnowledgeBase',
+    description: 'Search Naval\'s knowledge base for relevant information and insights',
     parameters: z.object({
-        query: z.string().min(1).describe('The search query to find relevant information')
-    }),
+        query: z.string().describe('The search query to find relevant information')
+    })
 };
 
 type Args = z.infer<typeof knowledgeBaseToolDefinition.parameters>;

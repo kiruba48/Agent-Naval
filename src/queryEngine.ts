@@ -31,8 +31,9 @@ export async function answerQuery(
             conversationId
         });
 
-        // If structured response requested, try to parse it
-        if (structured && response) {
+        // Only try to parse as JSON if it looks like a JSON response
+        // This avoids trying to parse simple text responses like greetings
+        if (structured && response && response.trim().startsWith('{')) {
             try {
                 return JSON.parse(response) as StructuredAnswer;
             } catch (error) {

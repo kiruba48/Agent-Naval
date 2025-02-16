@@ -4,24 +4,30 @@ import {
     ConversationMetadata, 
     Message,
     CreateMessage,
-    FirebaseConversation 
+    TopicSegment,
+    FirebaseConversation,
+    CreateSummary 
 } from '../types';
 import { 
-    FIREBASE_PATHS, 
+    FIREBASE_PATHS,
     CONVERSATION_STATUS,
     DEFAULT_CONVERSATION_CONFIG 
 } from '../constants/config';
-import { Timestamp } from 'firebase/firestore';
 
-type FirebaseMetadata = Omit<ConversationMetadata, 'startTime' | 'lastActivity'> & {
-    startTime: Timestamp;
-    lastActivity: Timestamp;
-};
+// Firebase-specific types that use string dates
+interface FirebaseMetadata extends Omit<ConversationMetadata, 'startTime' | 'lastActivity'> {
+    startTime: string;
+    lastActivity: string;
+}
+
+interface FirebaseStorageConversation extends Omit<FirebaseConversation, 'metadata'> {
+    metadata: FirebaseMetadata;
+}
 
 /**
  * Service for managing conversations in Firebase
  */
-class ConversationService extends BaseService {
+export class ConversationService extends BaseService {
     private static instance: ConversationService;
 
     private constructor() {
@@ -39,16 +45,24 @@ class ConversationService extends BaseService {
      * Create a new conversation session
      */
     async createSession(userId: string): Promise<ConversationSession> {
+        const now = new Date();
         const metadata: ConversationMetadata = {
             userId,
             status: CONVERSATION_STATUS.active,
-            startTime: new Date(),
-            lastActivity: new Date(),
+            startTime: now,
+            lastActivity: now,
             messageCount: 0
         };
 
-        const session: Partial<FirebaseConversation> = {
-            metadata,
+        // Convert to Firebase storage format
+        const storageMetadata: FirebaseMetadata = {
+            ...metadata,
+            startTime: now.toISOString(),
+            lastActivity: now.toISOString()
+        };
+
+        const session: Partial<FirebaseStorageConversation> = {
+            metadata: storageMetadata,
             messages: {},
             topics: {},
             summaries: {}
@@ -67,7 +81,7 @@ class ConversationService extends BaseService {
                     themes: [],
                     messageCount: 0,
                     status: 'active',
-                    timestamp: new Date()
+                    timestamp: now
                 }
             }
         };
@@ -86,7 +100,7 @@ class ConversationService extends BaseService {
         await this.updateData(
             this.getConversationPath(conversationId, 'metadata'),
             {
-                lastActivity: new Date(),
+                lastActivity: new Date().toISOString(),
                 messageCount: (await this.getMessageCount(conversationId)) + 1
             }
         );
@@ -140,15 +154,14 @@ class ConversationService extends BaseService {
         );
 
         if (!metadata) {
-            // This should never happen if exists() returned true
             throw new Error(`Metadata corrupted for conversation ${conversationId}`);
         }
 
-        // Convert Firestore timestamps to JavaScript Dates
+        // Convert from Firebase storage format to application type
         return {
             ...metadata,
-            startTime: metadata.startTime.toDate(),
-            lastActivity: metadata.lastActivity.toDate()
+            startTime: new Date(metadata.startTime),
+            lastActivity: new Date(metadata.lastActivity)
         };
     }
 
@@ -185,7 +198,7 @@ class ConversationService extends BaseService {
             this.getConversationPath(conversationId, 'metadata'),
             {
                 status: CONVERSATION_STATUS.completed,
-                lastActivity: new Date()
+                lastActivity: new Date().toISOString()
             }
         );
     }
@@ -200,11 +213,11 @@ class ConversationService extends BaseService {
         // Create a new object without date fields first
         const { startTime, lastActivity, ...otherUpdates } = updates;
         
-        // Then construct firebaseUpdates with converted Timestamps
+        // Convert dates to ISO strings for Firebase storage
         const firebaseUpdates: Partial<FirebaseMetadata> = {
             ...otherUpdates,
-            ...(startTime && { startTime: Timestamp.fromDate(startTime) }),
-            ...(lastActivity && { lastActivity: Timestamp.fromDate(lastActivity) })
+            ...(startTime && { startTime: startTime.toISOString() }),
+            ...(lastActivity && { lastActivity: lastActivity.toISOString() })
         };
 
         await this.updateData(
