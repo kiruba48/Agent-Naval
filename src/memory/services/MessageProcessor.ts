@@ -1,281 +1,412 @@
 import { BaseService } from './BaseService';
 import { conversationService } from './ConversationService';
-import { SummaryService } from './SummaryService';  
+import { SummaryService } from './SummaryService';
 import { MESSAGE_PROCESSOR_CONFIG } from '../constants/message';
 import { Message, CreateMessage } from '../types';
-import { 
-    ProcessingResult,
-    MessageOperation,
-    MessageProcessingErrorType
+import {
+  ProcessingResult,
+  MessageOperation,
+  MessageProcessingErrorType,
 } from '../types/message';
 import { ProcessingError } from '../errors/ProcessingError';
 import { logger } from '../../utils/logger';
+import { MessageRole } from '../types/conversation';
+
+// Type for tool call validation
+interface ToolCall {
+  id: string;
+  type: 'function';
+  function: {
+    name: string;
+    arguments: string;
+  };
+}
+
+// Type for complete exchange validation
+interface CompleteExchange {
+  userMessage: Message;
+  assistantToolCall: Message & { tool_calls: ToolCall[] };
+  toolResponse: Message;
+  finalAnswer: Message;
+}
 
 /**
  * Service for processing messages and managing conversation summaries
  */
 export class MessageProcessor extends BaseService {
-    private static instance: MessageProcessor;
-    private conversationService = conversationService;
-    private summaryService?: SummaryService;  
-    private config = MESSAGE_PROCESSOR_CONFIG;
+  private static instance: MessageProcessor;
+  private conversationService = conversationService;
+  private summaryService?: SummaryService;
+  private config = MESSAGE_PROCESSOR_CONFIG;
+  private toolCallCounters: Map<string, number> = new Map();
+  private readonly MAX_CONSECUTIVE_TOOL_CALLS = 3;
 
-    private constructor() {
-        super();
+  private constructor() {
+    super();
+  }
+
+  public static getInstance(): MessageProcessor {
+    if (!MessageProcessor.instance) {
+      MessageProcessor.instance = new MessageProcessor();
     }
+    return MessageProcessor.instance;
+  }
 
-    public static getInstance(): MessageProcessor {
-        if (!MessageProcessor.instance) {
-            MessageProcessor.instance = new MessageProcessor();
-        }
-        return MessageProcessor.instance;
+  /**
+   * Initialize dependencies after construction
+   */
+  public initializeDependencies(summaryService: SummaryService) {
+    this.summaryService = summaryService;
+  }
+
+  /**
+   * Get the summary service instance, throwing if not initialized
+   */
+  private getSummaryService(): SummaryService {
+    if (!this.summaryService) {
+      throw new Error('SummaryService not initialized in MessageProcessor');
     }
+    return this.summaryService;
+  }
 
-    /**
-     * Initialize dependencies after construction
-     */
-    public initializeDependencies(summaryService: SummaryService) {
-        this.summaryService = summaryService;
-    }
+  /**
+   * Process a message pair (user + assistant messages)
+   */
+  public async processMessagePair(
+    conversationId: string,
+    userMessage: string,
+    assistantMessage: string
+  ): Promise<ProcessingResult> {
+    try {
+      // Get conversation metadata (will throw if conversation doesn't exist)
+      const metadata = await this.withErrorHandling(
+        () => this.conversationService.getMetadata(conversationId),
+        MessageOperation.GET_METADATA
+      );
 
-    /**
-     * Get the summary service instance, throwing if not initialized
-     */
-    private getSummaryService(): SummaryService {
-        if (!this.summaryService) {
-            throw new Error('SummaryService not initialized in MessageProcessor');
-        }
-        return this.summaryService;
-    }
-
-    /**
-     * Process a message pair (user + assistant messages)
-     */
-    public async processMessagePair(
-        conversationId: string,
-        userMessage: string,
-        assistantMessage: string
-    ): Promise<ProcessingResult> {
-        try {
-            // Get conversation metadata (will throw if conversation doesn't exist)
-            const metadata = await this.withErrorHandling(
-                () => this.conversationService.getMetadata(conversationId),
-                MessageOperation.GET_METADATA
-            );
-
-            // Store messages
-            const result = await this.withErrorHandling(async () => {
-                const userMsg = await this.conversationService.addMessage(conversationId, {
-                    role: 'user',
-                    content: userMessage,
-                    timestamp: new Date()
-                });
-
-                const assistantMsg = await this.conversationService.addMessage(conversationId, {
-                    role: 'assistant',
-                    content: assistantMessage,
-                    timestamp: new Date()
-                });
-
-                return { userMsg, assistantMsg };
-            }, MessageOperation.STORE_MESSAGE);
-
-            // Update message count
-            const newCount = metadata.messageCount + 2;
-            await this.updateConversationMetadata(conversationId, newCount);
-
-            // Trigger summary generation in background if needed
-            if (this.shouldGenerateSummary(newCount)) {
-                logger.info('Triggering summary generation', { conversationId, messageCount: newCount });
-                this.triggerSummaryGeneration(conversationId, newCount)
-                    .catch(error => logger.error('Background summary generation failed:', { error, conversationId }));
-            }
-
-            return {
-                success: true,
-                messageIds: [result.userMsg.id, result.assistantMsg.id],
-                summaryPending: this.shouldGenerateSummary(newCount)
-            };
-
-        } catch (error) {
-            const processingError = error instanceof ProcessingError 
-                ? error 
-                : new ProcessingError(
-                    MessageOperation.STORE_MESSAGE,
-                    error instanceof Error ? error : new Error(String(error))
-                );
-
-            logger.error('Error processing message pair:', { 
-                error: processingError,
-                conversationId 
-            });
-
-            return {
-                success: false,
-                messageIds: [],
-                summaryPending: false,
-                error: {
-                    operation: processingError.operation,
-                    type: processingError.type,
-                    error: processingError.error
-                }
-            };
-        }
-    }
-
-    /**
-     * Add a single message to the conversation
-     */
-    public async addMessage(
-        conversationId: string,
-        message: CreateMessage
-    ): Promise<Message> {
-        // Get conversation metadata (will throw if conversation doesn't exist)
-        const metadata = await this.withErrorHandling(
-            () => this.conversationService.getMetadata(conversationId),
-            MessageOperation.GET_METADATA
+      // Store messages
+      const result = await this.withErrorHandling(async () => {
+        const userMsg = await this.conversationService.addMessage(
+          conversationId,
+          {
+            role: 'user',
+            content: userMessage,
+            timestamp: new Date(),
+          }
         );
 
-        // Store message
-        const storedMessage = await this.withErrorHandling(
-            () => this.conversationService.addMessage(conversationId, message),
-            MessageOperation.STORE_MESSAGE
+        const assistantMsg = await this.conversationService.addMessage(
+          conversationId,
+          {
+            role: 'assistant',
+            content: assistantMessage,
+            timestamp: new Date(),
+          }
         );
 
-        // Update message count
-        const newCount = metadata.messageCount + 1;
-        await this.updateConversationMetadata(conversationId, newCount);
+        return { userMsg, assistantMsg };
+      }, MessageOperation.STORE_MESSAGE);
 
-        // Trigger summary generation in background if needed
-        if (this.shouldGenerateSummary(newCount)) {
-            logger.info('Triggering summary generation', { conversationId, messageCount: newCount });
-            this.triggerSummaryGeneration(conversationId, newCount)
-                .catch(error => logger.error('Background summary generation failed:', { error, conversationId }));
-        }
+      // Update message count
+      const newCount = metadata.messageCount + 2;
+      await this.updateConversationMetadata(conversationId, newCount);
 
-        return storedMessage;
-    }
+      // Temporarily disable summary generation
+      // if (this.shouldGenerateSummary(newCount)) {
+      //   logger.info('Triggering summary generation', {
+      //     conversationId,
+      //     messageCount: newCount,
+      //   });
+      //   this.triggerSummaryGeneration(conversationId, newCount).catch((error) =>
+      //     logger.error('Background summary generation failed:', {
+      //       error,
+      //       conversationId,
+      //     })
+      //   );
+      // }
 
-    /**
-     * Get messages for summary generation, handling tool calls appropriately.
-     * This is used by both MessageProcessor and SummaryService to ensure consistent
-     * message preparation for summarization.
-     */
-    public async getMessagesForSummary(conversationId: string): Promise<Message[]> {
-        logger.debug('Fetching messages for summary', { conversationId });
-        
-        // Get last 10 messages (5 pairs)
-        const messages = await this.conversationService.getLastMessages(conversationId, 10);
-        
-        // If the last message has tool calls, get the next message which will be the tool response
-        const lastMessage = messages[messages.length - 1];
-        // @ts-ignore - handle both snake_case from LLM and camelCase from our storage
-        if (lastMessage?.role === 'assistant' && (lastMessage.tool_calls || lastMessage.toolCalls)) {
-            // Get one more message to include the tool response
-            const extraContext = await this.conversationService.getLastMessages(
-                conversationId,
-                11  // Get 11 to include the tool response
+      return {
+        success: true,
+        messageIds: [result.userMsg.id, result.assistantMsg.id],
+        summaryPending: false, // Always false while summary generation is disabled
+      };
+    } catch (error) {
+      const processingError =
+        error instanceof ProcessingError
+          ? error
+          : new ProcessingError(
+              MessageOperation.STORE_MESSAGE,
+              error instanceof Error ? error : new Error(String(error))
             );
-            
-            logger.debug('Including extra context for tool call', {
-                conversationId,
-                originalCount: messages.length,
-                newCount: extraContext.length
-            });
-            
-            // Return the extra message if we found it
-            return extraContext.length > 10 ? extraContext.slice(-11) : messages;
-        }
 
-        return messages;
+      logger.error('Error processing message pair:', {
+        error: processingError,
+        conversationId,
+      });
+
+      return {
+        success: false,
+        messageIds: [],
+        summaryPending: false, // Always false while summary generation is disabled
+        error: {
+          operation: processingError.operation,
+          type: processingError.type,
+          error: processingError.error,
+        },
+      };
+    }
+  }
+
+  /**
+   * Add a single message to the conversation
+   */
+  public async addMessage(
+    conversationId: string,
+    message: CreateMessage
+  ): Promise<Message> {
+    // Get conversation metadata (will throw if conversation doesn't exist)
+    const metadata = await this.withErrorHandling(
+      () => this.conversationService.getMetadata(conversationId),
+      MessageOperation.GET_METADATA
+    );
+
+    // Store message
+    const storedMessage = await this.withErrorHandling(
+      () => this.conversationService.addMessage(conversationId, message),
+      MessageOperation.STORE_MESSAGE
+    );
+
+    // Check for tool call loops
+    this.checkToolCallLoop(conversationId, storedMessage);
+
+    // Update message count
+    const newCount = metadata.messageCount + 1;
+    await this.updateConversationMetadata(conversationId, newCount);
+
+    // Temporarily disable summary generation
+    // if (
+    //   this.shouldGenerateSummary(newCount) &&
+    //   !this.hasPendingToolCalls(conversationId)
+    // ) {
+    //   logger.info('Triggering summary generation', {
+    //     conversationId,
+    //     messageCount: newCount,
+    //   });
+    //   this.triggerSummaryGeneration(conversationId, newCount).catch((error) =>
+    //     logger.error('Background summary generation failed:', {
+    //       error,
+    //       conversationId,
+    //     })
+    //   );
+    // }
+
+    return storedMessage;
+  }
+
+  /**
+   * Get messages for summary generation, handling tool calls appropriately.
+   * This is used by both MessageProcessor and SummaryService to ensure consistent
+   * message preparation for summarization.
+   */
+  public async getMessagesForSummary(
+    conversationId: string
+  ): Promise<Message[]> {
+    logger.debug('Fetching messages for summary', { conversationId });
+
+    // Get last 14 messages to ensure we capture complete exchanges
+    const messages = await this.conversationService.getLastMessages(
+      conversationId,
+      14
+    );
+
+    // Find complete exchange
+    const completeExchange = this.findCompleteExchange(messages);
+    if (completeExchange) {
+      logger.debug('Found complete tool call exchange', {
+        conversationId,
+        exchangeLength: 4,
+      });
+      return messages.slice(-4); // Return the complete exchange
     }
 
-    /**
-     * Trigger summary generation as a background task
-     */
-    private async triggerSummaryGeneration(
-        conversationId: string,
-        messageCount: number
-    ): Promise<void> {
-        const startTime = Date.now();
-        logger.info('Starting summary generation', { conversationId, messageCount });
-       
-        try {
-            // Get messages for summary
-            const messages = await this.getMessagesForSummary(conversationId);
-            
-            // Collect themes from messages
-            const themes = messages.reduce<string[]>((acc, msg) => {
-                if (msg.themes) acc.push(...msg.themes);
-                return acc;
-            }, []);
+    // If no complete exchange found, return standard context size
+    return messages.slice(-10);
+  }
 
-            // Generate summary using SummaryService
-            await this.getSummaryService().generateRecentSummary(
-                conversationId,
-                messages,
-                Array.from(new Set(themes))
-            );
-            
-            logger.info('Summary generation completed', {
-                conversationId,
-                timing: Date.now() - startTime,
-                themes: themes.length
-            });
-        } catch (error) {
-            const processingError = error instanceof ProcessingError 
-                ? error 
-                : new ProcessingError(
-                    MessageOperation.GENERATE_SUMMARY,
-                    error instanceof Error ? error : new Error(String(error))
-                );
+  /**
+   * Find a complete tool call exchange in messages
+   */
+  private findCompleteExchange(messages: Message[]): CompleteExchange | null {
+    if (messages.length < 4) return null;
 
-            logger.error('Summary generation failed', {
-                conversationId,
-                error: processingError,
-                timing: Date.now() - startTime
-            });
+    for (let i = messages.length - 4; i >= 0; i--) {
+      const sequence = messages.slice(i, i + 4);
+      if (this.isCompleteToolCallSequence(sequence)) {
+        return {
+          userMessage: sequence[0],
+          assistantToolCall: sequence[1] as Message & {
+            tool_calls: ToolCall[];
+          },
+          toolResponse: sequence[2],
+          finalAnswer: sequence[3],
+        };
+      }
+    }
+    return null;
+  }
 
-            throw processingError;
-        }
+  /**
+   * Validate if a sequence of messages forms a complete tool call exchange
+   */
+  private isCompleteToolCallSequence(messages: Message[]): boolean {
+    if (messages.length !== 4) return false;
+
+    const [user, assistant, tool, final] = messages;
+
+    return (
+      user.role === 'user' &&
+      assistant.role === 'assistant' &&
+      Array.isArray(assistant.tool_calls) &&
+      assistant.tool_calls.length > 0 &&
+      tool.role === 'tool' &&
+      final.role === 'assistant' &&
+      !final.tool_calls
+    );
+  }
+
+  /**
+   * Track and prevent tool call loops
+   */
+  private checkToolCallLoop(conversationId: string, message: Message): void {
+    // Reset counter for non-tool-call messages
+    if (
+      message.role === 'tool' ||
+      (message.role === 'assistant' && !message.tool_calls)
+    ) {
+      this.toolCallCounters.set(conversationId, 0);
+      return;
     }
 
-    /**
-     * Check if we should generate a summary based on message count
-     */
-    private shouldGenerateSummary(messageCount: number): boolean {
-        return messageCount % this.config.summaryChunkSize === 0;
-    }
+    // Increment counter for assistant messages with tool calls
+    if (message.role === 'assistant' && message.tool_calls?.length) {
+      const currentCount = (this.toolCallCounters.get(conversationId) || 0) + 1;
+      this.toolCallCounters.set(conversationId, currentCount);
 
-    /**
-     * Update conversation metadata with new message count
-     */
-    private async updateConversationMetadata(
-        conversationId: string,
-        messageCount: number
-    ): Promise<void> {
-        await this.withErrorHandling(
-            () => this.conversationService.updateMetadata(conversationId, { messageCount }),
-            MessageOperation.UPDATE_METADATA
+      if (currentCount > this.MAX_CONSECUTIVE_TOOL_CALLS) {
+        logger.error('Tool call loop detected', {
+          conversationId,
+          consecutiveCalls: currentCount,
+        });
+        throw new ProcessingError(
+          MessageOperation.STORE_MESSAGE,
+          new Error(
+            `Tool call loop detected: ${currentCount} consecutive calls`
+          )
         );
+      }
     }
+  }
 
-    /**
-     * Error handling wrapper with operation context
-     */
-    private async withErrorHandling<T>(
-        operation: () => Promise<T>,
-        operationType: MessageOperation
-    ): Promise<T> {
-        try {
-            return await operation();
-        } catch (error) {
-            throw new ProcessingError(
-                operationType,
-                error instanceof Error ? error : new Error(String(error))
+  /**
+   * Check if there are pending tool calls in the conversation
+   */
+  private hasPendingToolCalls(conversationId: string): boolean {
+    return (this.toolCallCounters.get(conversationId) || 0) > 0;
+  }
+
+  /**
+   * Trigger summary generation as a background task
+   */
+  private async triggerSummaryGeneration(
+    conversationId: string,
+    messageCount: number
+  ): Promise<void> {
+    const startTime = Date.now();
+    logger.info('Starting summary generation', {
+      conversationId,
+      messageCount,
+    });
+
+    try {
+      // Get messages for summary
+      const messages = await this.getMessagesForSummary(conversationId);
+
+      // Collect themes from messages
+      const themes = messages.reduce<string[]>((acc, msg) => {
+        if (msg.themes) acc.push(...msg.themes);
+        return acc;
+      }, []);
+
+      // Generate summary using SummaryService
+      await this.getSummaryService().generateRecentSummary(
+        conversationId,
+        messages,
+        Array.from(new Set(themes))
+      );
+
+      logger.info('Summary generation completed', {
+        conversationId,
+        timing: Date.now() - startTime,
+        themes: themes.length,
+      });
+    } catch (error) {
+      const processingError =
+        error instanceof ProcessingError
+          ? error
+          : new ProcessingError(
+              MessageOperation.GENERATE_SUMMARY,
+              error instanceof Error ? error : new Error(String(error))
             );
-        }
+
+      logger.error('Summary generation failed', {
+        conversationId,
+        error: processingError,
+        timing: Date.now() - startTime,
+      });
+
+      throw processingError;
     }
+  }
+
+  /**
+   * Check if we should generate a summary based on message count
+   */
+  private shouldGenerateSummary(messageCount: number): boolean {
+    return messageCount % this.config.summaryChunkSize === 0;
+  }
+
+  /**
+   * Update conversation metadata with new message count
+   */
+  private async updateConversationMetadata(
+    conversationId: string,
+    messageCount: number
+  ): Promise<void> {
+    await this.withErrorHandling(
+      () =>
+        this.conversationService.updateMetadata(conversationId, {
+          messageCount,
+        }),
+      MessageOperation.UPDATE_METADATA
+    );
+  }
+
+  /**
+   * Error handling wrapper with operation context
+   */
+  private async withErrorHandling<T>(
+    operation: () => Promise<T>,
+    operationType: MessageOperation
+  ): Promise<T> {
+    try {
+      return await operation();
+    } catch (error) {
+      throw new ProcessingError(
+        operationType,
+        error instanceof Error ? error : new Error(String(error))
+      );
+    }
+  }
 }
 
 // Export only the singleton instance

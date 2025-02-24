@@ -5,20 +5,20 @@ import { SummaryService } from './SummaryService';
  * Initialize all services and their dependencies
  */
 export function initializeServices() {
-    // Get service instances
-    const messageProcessor = MessageProcessor.getInstance();
-    const summaryService = SummaryService.getInstance();
+  // Get service instances
+  const messageProcessor = MessageProcessor.getInstance();
 
-    // Initialize dependencies
-    messageProcessor.initializeDependencies(summaryService);
-    summaryService.initializeDependencies(messageProcessor);
+  // Temporarily disable summary service
+  // const summaryService = SummaryService.getInstance();
+  // messageProcessor.initializeDependencies(summaryService);
+  // summaryService.initializeDependencies(messageProcessor);
 
-    return {
-        messageProcessor,
-        summaryService
-    };
+  return {
+    messageProcessor,
+    // summaryService
+  };
 }
 
 // Initialize services and export instances
-const { messageProcessor, summaryService } = initializeServices();
-export { messageProcessor, summaryService };
+const { messageProcessor } = initializeServices();
+export { messageProcessor };
