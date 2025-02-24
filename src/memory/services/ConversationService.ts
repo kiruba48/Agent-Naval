@@ -8,11 +8,10 @@ import {
     FirebaseConversation,
     CreateSummary 
 } from '../types';
-import { 
-    FIREBASE_PATHS,
-    CONVERSATION_STATUS,
-    DEFAULT_CONVERSATION_CONFIG 
-} from '../constants/config';
+import { ChatMessage } from '../types/conversation';
+import { FIREBASE_PATHS, DEFAULT_CONVERSATION_CONFIG, CONVERSATION_STATUS } from '../constants/config';
+import { logger } from '../../utils/logger';
+import { summaryService } from './initializeServices';
 
 // Firebase-specific types that use string dates
 interface FirebaseMetadata extends Omit<ConversationMetadata, 'startTime' | 'lastActivity'> {

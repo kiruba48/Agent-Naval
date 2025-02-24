@@ -19,13 +19,14 @@ export const logMessage = (message: AIMessage) => {
   const roleColors = {
     user: '\x1b[36m', // cyan
     assistant: '\x1b[32m', // green
+    tool: '\x1b[33m', // yellow
   }
 
   const reset = '\x1b[0m'
   const role = message.role
   const color = roleColors[role as keyof typeof roleColors] || '\x1b[37m' // default to white
 
-  // Don't log tool messages
+  // Skip tool responses in UI
   if (role === 'tool') {
     return
   }

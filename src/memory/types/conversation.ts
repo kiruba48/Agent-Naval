@@ -1,17 +1,33 @@
-export type MessageRole = 'system' | 'user' | 'assistant' | 'function';
+export type MessageRole = 'system' | 'user' | 'assistant' | 'tool';
 
 export interface Message {
     id?: string;
     role: MessageRole;
-    content: string;
+    content: string | null;  // Allow null for tool calls
     timestamp: Date;
     themes?: string[];
     embedding_id?: string;
-    name?: string;  // For function messages
-    function_call?: {  // For assistant messages that call functions
-        name: string;
-        arguments: string;
-    };
+    name?: string;  // For tool messages
+    tool_calls?: Array<{  // For assistant messages that make tool calls
+        id: string;
+        type: 'function';
+        function: {
+            name: string;
+            arguments: string;
+        };
+    }>;
+    tool_call_id?: string;  // For tool messages responding to tool calls
+}
+
+/**
+ * Message format optimized for summarization.
+ * Excludes function calls and other metadata not needed for summarizing content.
+ */
+export interface SummaryReadyMessage {
+    role: 'user' | 'assistant';  // Only user and assistant messages are relevant for summaries
+    content: string | null;             // The actual message content
+    timestamp: Date;             // When the message was sent
+    themes?: string[];          // Themes associated with the message
 }
 
 export interface ConversationContext {
@@ -44,10 +60,14 @@ export interface FirebaseConversation {
 // Helper type for OpenAI chat completion format
 export interface ChatMessage {
     role: MessageRole;
-    content: string;
+    content: string | null;
     name?: string;
-    function_call?: {
-        name: string;
-        arguments: string;
-    };
+    tool_calls?: Array<{
+        id: string;
+        function: {
+            name: string;
+            arguments: string;
+        };
+    }>;
+    tool_call_id?: string;
 }

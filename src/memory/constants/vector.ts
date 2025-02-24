@@ -4,14 +4,14 @@ import { VectorIndexConfig, VectorRetryConfig, QueryOptions } from '../types/vec
 export const VECTOR_INDICES: { [key: string]: VectorIndexConfig } = {
     KNOWLEDGE: {
         name: 'knowledge',
-        url: process.env.UPSTASH_KNOWLEDGE_URL!,
-        token: process.env.UPSTASH_KNOWLEDGE_TOKEN!,
+        url: process.env.UPSTASH_VECTOR_REST_URL!,
+        token: process.env.UPSTASH_VECTOR_REST_TOKEN!,
         dimensions: 1024 // text-embedding-3-small dimensions
     },
     CONVERSATIONS: {
         name: 'conversations',
-        url: process.env.UPSTASH_CONVERSATIONS_URL!,
-        token: process.env.UPSTASH_CONVERSATIONS_TOKEN!,
+        url: process.env.UPSTASH_VECTOR_REST_URL_CONVERSATION!,
+        token: process.env.UPSTASH_VECTOR_REST_TOKEN_CONVERSATION!,
         dimensions: 1024
     }
 };

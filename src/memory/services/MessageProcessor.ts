@@ -1,23 +1,23 @@
 import { BaseService } from './BaseService';
 import { conversationService } from './ConversationService';
-import { summaryService } from './SummaryService';
+import { SummaryService } from './SummaryService';  
 import { MESSAGE_PROCESSOR_CONFIG } from '../constants/message';
+import { Message, CreateMessage } from '../types';
 import { 
-    MessagePair, 
-    ProcessingError,
     ProcessingResult,
     MessageOperation,
     MessageProcessingErrorType
 } from '../types/message';
-import { CreateMessage, Message } from '../types';
+import { ProcessingError } from '../errors/ProcessingError';
+import { logger } from '../../utils/logger';
 
 /**
  * Service for processing messages and managing conversation summaries
  */
-class MessageProcessor extends BaseService {
+export class MessageProcessor extends BaseService {
     private static instance: MessageProcessor;
     private conversationService = conversationService;
-    private summaryService = summaryService;
+    private summaryService?: SummaryService;  
     private config = MESSAGE_PROCESSOR_CONFIG;
 
     private constructor() {
@@ -29,6 +29,23 @@ class MessageProcessor extends BaseService {
             MessageProcessor.instance = new MessageProcessor();
         }
         return MessageProcessor.instance;
+    }
+
+    /**
+     * Initialize dependencies after construction
+     */
+    public initializeDependencies(summaryService: SummaryService) {
+        this.summaryService = summaryService;
+    }
+
+    /**
+     * Get the summary service instance, throwing if not initialized
+     */
+    private getSummaryService(): SummaryService {
+        if (!this.summaryService) {
+            throw new Error('SummaryService not initialized in MessageProcessor');
+        }
+        return this.summaryService;
     }
 
     /**
@@ -69,8 +86,9 @@ class MessageProcessor extends BaseService {
 
             // Trigger summary generation in background if needed
             if (this.shouldGenerateSummary(newCount)) {
+                logger.info('Triggering summary generation', { conversationId, messageCount: newCount });
                 this.triggerSummaryGeneration(conversationId, newCount)
-                    .catch(error => console.error('Background summary generation failed:', error));
+                    .catch(error => logger.error('Background summary generation failed:', { error, conversationId }));
             }
 
             return {
@@ -80,30 +98,28 @@ class MessageProcessor extends BaseService {
             };
 
         } catch (error) {
-            if (error instanceof Error && error.message.includes('not found')) {
-                return {
-                    success: false,
-                    messageIds: [],
-                    summaryPending: false,
-                    error: {
-                        operation: MessageOperation.GET_METADATA,
-                        type: MessageProcessingErrorType.CONVERSATION_NOT_FOUND,
-                        error: error
-                    }
-                };
-            } else {
-                console.error('Error processing message pair:', error);
-                return {
-                    success: false,
-                    messageIds: [],
-                    summaryPending: false,
-                    error: {
-                        operation: MessageOperation.STORE_MESSAGE,
-                        type: MessageProcessingErrorType.STORAGE_ERROR,
-                        error: error instanceof Error ? error : new Error(String(error))
-                    }
-                };
-            }
+            const processingError = error instanceof ProcessingError 
+                ? error 
+                : new ProcessingError(
+                    MessageOperation.STORE_MESSAGE,
+                    error instanceof Error ? error : new Error(String(error))
+                );
+
+            logger.error('Error processing message pair:', { 
+                error: processingError,
+                conversationId 
+            });
+
+            return {
+                success: false,
+                messageIds: [],
+                summaryPending: false,
+                error: {
+                    operation: processingError.operation,
+                    type: processingError.type,
+                    error: processingError.error
+                }
+            };
         }
     }
 
@@ -132,17 +148,22 @@ class MessageProcessor extends BaseService {
 
         // Trigger summary generation in background if needed
         if (this.shouldGenerateSummary(newCount)) {
+            logger.info('Triggering summary generation', { conversationId, messageCount: newCount });
             this.triggerSummaryGeneration(conversationId, newCount)
-                .catch(error => console.error('Background summary generation failed:', error));
+                .catch(error => logger.error('Background summary generation failed:', { error, conversationId }));
         }
 
         return storedMessage;
     }
 
     /**
-     * Get messages for summary generation, handling tool calls appropriately
+     * Get messages for summary generation, handling tool calls appropriately.
+     * This is used by both MessageProcessor and SummaryService to ensure consistent
+     * message preparation for summarization.
      */
-    private async getMessagesForSummary(conversationId: string): Promise<Message[]> {
+    public async getMessagesForSummary(conversationId: string): Promise<Message[]> {
+        logger.debug('Fetching messages for summary', { conversationId });
+        
         // Get last 10 messages (5 pairs)
         const messages = await this.conversationService.getLastMessages(conversationId, 10);
         
@@ -155,6 +176,12 @@ class MessageProcessor extends BaseService {
                 conversationId,
                 11  // Get 11 to include the tool response
             );
+            
+            logger.debug('Including extra context for tool call', {
+                conversationId,
+                originalCount: messages.length,
+                newCount: extraContext.length
+            });
             
             // Return the extra message if we found it
             return extraContext.length > 10 ? extraContext.slice(-11) : messages;
@@ -170,32 +197,46 @@ class MessageProcessor extends BaseService {
         conversationId: string,
         messageCount: number
     ): Promise<void> {
+        const startTime = Date.now();
+        logger.info('Starting summary generation', { conversationId, messageCount });
+       
         try {
-            // Get messages including extra context if needed
+            // Get messages for summary
             const messages = await this.getMessagesForSummary(conversationId);
             
-            // Extract themes and generate summary
+            // Collect themes from messages
             const themes = messages.reduce<string[]>((acc, msg) => {
-                if (msg.themes) {
-                    acc.push(...msg.themes);
-                }
+                if (msg.themes) acc.push(...msg.themes);
                 return acc;
             }, []);
 
-            // Create the summary
-            await this.summaryService.createSummary(
+            // Generate summary using SummaryService
+            await this.getSummaryService().generateRecentSummary(
                 conversationId,
-                'recent',
-                JSON.stringify(messages.map(m => ({
-                    role: m.role,
-                    content: m.content
-                }))),
-                Array.from(new Set(themes))  // Deduplicate themes
+                messages,
+                Array.from(new Set(themes))
             );
-
+            
+            logger.info('Summary generation completed', {
+                conversationId,
+                timing: Date.now() - startTime,
+                themes: themes.length
+            });
         } catch (error) {
-            console.error('Error generating summary:', error);
-            throw error;
+            const processingError = error instanceof ProcessingError 
+                ? error 
+                : new ProcessingError(
+                    MessageOperation.GENERATE_SUMMARY,
+                    error instanceof Error ? error : new Error(String(error))
+                );
+
+            logger.error('Summary generation failed', {
+                conversationId,
+                error: processingError,
+                timing: Date.now() - startTime
+            });
+
+            throw processingError;
         }
     }
 
@@ -203,47 +244,36 @@ class MessageProcessor extends BaseService {
      * Check if we should generate a summary based on message count
      */
     private shouldGenerateSummary(messageCount: number): boolean {
-        return messageCount > 0 && messageCount % this.config.summaryChunkSize === 0;
+        return messageCount % this.config.summaryChunkSize === 0;
     }
 
     /**
-     * Update conversation metadata
+     * Update conversation metadata with new message count
      */
     private async updateConversationMetadata(
         conversationId: string,
         messageCount: number
     ): Promise<void> {
-        await this.withErrorHandling(async () => {
-            await this.conversationService.updateMetadata(conversationId, {
-                messageCount,
-                lastActivity: new Date()
-            });
-        }, MessageOperation.UPDATE_METADATA);
+        await this.withErrorHandling(
+            () => this.conversationService.updateMetadata(conversationId, { messageCount }),
+            MessageOperation.UPDATE_METADATA
+        );
     }
 
     /**
-     * Error handling wrapper for async operations
+     * Error handling wrapper with operation context
      */
     private async withErrorHandling<T>(
         operation: () => Promise<T>,
-        operationType: MessageOperation,
-        retryCount = 0
+        operationType: MessageOperation
     ): Promise<T> {
         try {
             return await operation();
         } catch (error) {
-            if (retryCount < this.config.maxRetries) {
-                // Wait before retrying
-                await new Promise(resolve => 
-                    setTimeout(resolve, this.config.retryDelayMs)
-                );
-                return this.withErrorHandling(
-                    operation,
-                    operationType,
-                    retryCount + 1
-                );
-            }
-            throw error;
+            throw new ProcessingError(
+                operationType,
+                error instanceof Error ? error : new Error(String(error))
+            );
         }
     }
 }

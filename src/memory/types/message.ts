@@ -22,17 +22,18 @@ export enum MessageProcessingErrorType {
     NETWORK_ERROR = 'NETWORK_ERROR'                       // Network/connection issues
 }
 
-export interface ProcessingError {
-    operation: MessageOperation;              // What operation was being performed
-    type: MessageProcessingErrorType;         // Type of error that occurred
-    error: Error;                             // The actual error object
+// Type for error information in processing results
+export interface ProcessingErrorInfo {
+    operation: MessageOperation;
+    type: MessageProcessingErrorType;
+    error: Error;
 }
 
 export interface ProcessingResult {
     success: boolean;
     messageIds: string[];
     summaryPending: boolean;  // Indicates if summary generation was triggered
-    error?: ProcessingError;
+    error?: ProcessingErrorInfo;
 }
 
 export interface MessageProcessorConfig {
