@@ -38,6 +38,15 @@ export const runAgent = async ({
       // Get conversation history
       const history = await conversationService.getLastMessages(conversationId);
 
+      logger.debug('Conversation history structure', {
+        messages: history.map((msg) => ({
+          role: msg.role,
+          has_tool_calls: !!msg.tool_calls,
+          has_content: !!msg.content,
+          tool_calls_count: msg.tool_calls?.length,
+        })),
+      });
+
       logger.debug('Conversation history for OpenAI', {
         history_length: history.length,
         last_message: history[history.length - 1],
@@ -101,42 +110,27 @@ export const runAgent = async ({
           return 'Maximum tool calls (3) reached. Please try a different approach.';
         }
 
-        const toolCall = response.tool_calls[0];
-        logger.debug('Processing tool call', {
-          tool_name: toolCall.function.name,
-          args: toolCall.function.arguments,
-          callNumber: toolCallCount,
-        });
-        loader.update(
-          `executing: ${toolCall.function.name} (call ${toolCallCount}/${MAX_TOOL_CALLS})`
-        );
-
-        try {
-          const toolResponse = await runTool(toolCall, userMessage);
-          logger.debug('Tool response received', {
-            tool_name: toolCall.function.name,
-            response: toolResponse,
+        for (const toolCall of response.tool_calls) {
+          logger.debug('Processing tool call', {
+            tool: toolCall.function.name,
+            args: toolCall.function.arguments,
           });
 
-          // Save tool response to conversation history
+          const result = await runTool(toolCall, userMessage);
+          
+          // Format the tool response into a string
+          const formattedResult = typeof result === 'string' 
+            ? result 
+            : JSON.stringify(result, null, 2);
+          
+          // Add tool response with proper structure
           await messageProcessor.addMessage(conversationId, {
             role: 'tool',
-            content: JSON.stringify(toolResponse),
             name: toolCall.function.name,
-            tool_call_id: toolCall.id,
+            content: formattedResult,
             timestamp: new Date(),
+            tool_call_id: toolCall.id // Important: Link response to specific tool call
           });
-
-          loader.update(`executed: ${toolCall.function.name}`);
-        } catch (error) {
-          logger.error('Tool execution failed', {
-            error: error instanceof Error ? error.message : String(error),
-            tool_name: toolCall.function.name,
-          });
-          loader.stop();
-          return `I encountered an error while trying to answer your question: ${
-            error instanceof Error ? error.message : String(error)
-          }`;
         }
       }
     }

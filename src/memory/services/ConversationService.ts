@@ -134,15 +134,21 @@ export class ConversationService extends BaseService {
 
     if (!messages) return [];
 
-    // Convert to array and take last N messages, preserving Firebase's natural chronological order
-    const messageArray = Object.entries(messages).map(
-      ([messageId, messageData]) => ({
-        ...messageData,
-        id: messageId,
-      })
-    );
+    const messageEntries = Object.entries(messages);
+    const lastMessages = messageEntries.slice(-count);
 
-    return messageArray.slice(-count);
+    // If first message is a tool response, include the previous message
+    if (lastMessages[0]?.[1].role === 'tool') {
+      const previousMessage = messageEntries[messageEntries.length - count - 1];
+      if (previousMessage) {
+        return [
+          { ...previousMessage[1], id: previousMessage[0] },
+          ...lastMessages.map(([id, msg]) => ({ ...msg, id })),
+        ];
+      }
+    }
+
+    return lastMessages.map(([id, msg]) => ({ ...msg, id }));
   }
 
   /**

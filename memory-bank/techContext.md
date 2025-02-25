@@ -85,6 +85,15 @@ pnpm init:themes
        content: string;
        timestamp: string;
        role: 'user' | 'assistant' | 'tool';
+       tool_calls?: Array<{
+         id: string;
+         type: 'function';
+         function: {
+           name: string;
+           arguments: string;
+         };
+       }>;
+       tool_call_id?: string;
      };
    }
    ```
@@ -94,14 +103,35 @@ pnpm init:themes
    - Push IDs are chronologically sortable by default
    - Natural ordering matches conversation flow
    - Efficient retrieval without manual sorting
+   - Maintains tool call context
 
 2. **Message Retrieval Strategy**:
 
    ```typescript
-   // Efficient slice-based retrieval
-   const messages = Object.entries(messageStore)
-     .map(([id, data]) => ({ id, ...data }))
-     .slice(-count);
+   // Enhanced retrieval with tool response context
+   async getLastMessages(conversationId: string, count: number): Promise<Message[]> {
+     const messages = await this.getData<Record<string, CreateMessage>>(
+       this.getConversationPath(conversationId, FIREBASE_PATHS.messages)
+     );
+
+     if (!messages) return [];
+
+     const messageEntries = Object.entries(messages);
+     const lastMessages = messageEntries.slice(-count);
+
+     // If first message is a tool response, include the previous message
+     if (lastMessages[0]?.[1].role === 'tool') {
+       const previousMessage = messageEntries[messageEntries.length - count - 1];
+       if (previousMessage) {
+         return [
+           { ...previousMessage[1], id: previousMessage[0] },
+           ...lastMessages.map(([id, msg]) => ({ ...msg, id })),
+         ];
+       }
+     }
+
+     return lastMessages.map(([id, msg]) => ({ ...msg, id }));
+   }
    ```
 
    **Advantages**:
@@ -109,6 +139,31 @@ pnpm init:themes
    - Minimal processing overhead
    - Preserves conversation order
    - Efficient memory usage
+   - Maintains tool call context
+   - Prevents OpenAI API errors
+
+3. **Message Display Strategy**:
+
+   ```typescript
+   // Dual-format message display
+   export const logMessage = (message: AIMessage) => {
+     // Technical logging for debugging
+     if (role === 'assistant') {
+       console.log(`\n${color}[ASSISTANT]${reset}`);
+       console.log(`${message.content}\n`);
+     }
+
+     // User-friendly output returned separately
+     return message.content; // Displayed with "💡 AI Response:"
+   };
+   ```
+
+   **Benefits**:
+
+   - Clear technical logging for debugging
+   - Enhanced user experience
+   - Distinct message type handling
+   - Preserved debugging capability
 
 ### Tool Call Management
 
@@ -159,17 +214,21 @@ pnpm init:themes
    - Avoid unnecessary sorting operations
    - Use Firebase's built-in ordering
    - Minimize data transformations
+   - Preserve tool call context
+   - Efficient message window management
 
 2. **Tool Call Efficiency**:
 
    - Hard limits on consecutive calls
    - Timeout boundaries
    - Clear completion criteria
+   - Context preservation between calls
 
 3. **Memory Usage**:
    - Efficient message slicing
    - Minimal state tracking
    - Smart context windowing
+   - Optimized tool response handling
 
 ## Error Handling Strategy
 
@@ -178,16 +237,19 @@ pnpm init:themes
    - Maximum call limit exceeded
    - Timeout reached
    - Invalid tool responses
+   - Missing tool call context
 
 2. **Message Processing Errors**:
 
    - Invalid message format
    - Missing required fields
    - Ordering issues
+   - Tool response context issues
 
 3. **Recovery Mechanisms**:
    - Graceful degradation
    - Clear user feedback
    - State recovery options
+   - Context preservation fallbacks
 
-This technical context reflects our current understanding and implementation decisions, particularly around message ordering and tool call handling. These decisions are crucial for maintaining system stability and performance while preventing issues like infinite tool call loops.
+This technical context reflects our current understanding and implementation decisions, particularly around message ordering, tool call handling, and display strategies. These decisions are crucial for maintaining system stability and performance while ensuring both technical visibility and user-friendly output.

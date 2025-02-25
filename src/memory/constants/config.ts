@@ -6,7 +6,7 @@ import { ConversationConfig } from '../types';
 export const DEFAULT_CONVERSATION_CONFIG: ConversationConfig = {
   immediateContextSize: 5, // Keep last 5 messages in immediate context
   topicChangeThreshold: 0.7, // Semantic similarity threshold for topic change
-  summaryInterval: 0, // Temporarily disable summary generation
+  summaryInterval: 10, // Create summary every 10 messages
   sessionTimeout: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
 };
 

@@ -7,18 +7,18 @@ import { SummaryService } from './SummaryService';
 export function initializeServices() {
   // Get service instances
   const messageProcessor = MessageProcessor.getInstance();
+  const summaryService = SummaryService.getInstance();
 
-  // Temporarily disable summary service
-  // const summaryService = SummaryService.getInstance();
-  // messageProcessor.initializeDependencies(summaryService);
-  // summaryService.initializeDependencies(messageProcessor);
+  // Initialize dependencies
+  messageProcessor.initializeDependencies(summaryService);
+  summaryService.initializeDependencies(messageProcessor);
 
   return {
     messageProcessor,
-    // summaryService
+    summaryService,
   };
 }
 
 // Initialize services and export instances
-const { messageProcessor } = initializeServices();
-export { messageProcessor };
+const { messageProcessor, summaryService } = initializeServices();
+export { messageProcessor, summaryService };

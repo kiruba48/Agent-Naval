@@ -111,24 +111,26 @@ export class MessageProcessor extends BaseService {
       const newCount = metadata.messageCount + 2;
       await this.updateConversationMetadata(conversationId, newCount);
 
-      // Temporarily disable summary generation
-      // if (this.shouldGenerateSummary(newCount)) {
-      //   logger.info('Triggering summary generation', {
-      //     conversationId,
-      //     messageCount: newCount,
-      //   });
-      //   this.triggerSummaryGeneration(conversationId, newCount).catch((error) =>
-      //     logger.error('Background summary generation failed:', {
-      //       error,
-      //       conversationId,
-      //     })
-      //   );
-      // }
+      // Check if we should generate a summary
+      let summaryPending = false;
+      if (this.shouldGenerateSummary(newCount)) {
+        logger.info('Triggering summary generation', {
+          conversationId,
+          messageCount: newCount,
+        });
+        summaryPending = true;
+        this.triggerSummaryGeneration(conversationId, newCount).catch((error) =>
+          logger.error('Background summary generation failed:', {
+            error,
+            conversationId,
+          })
+        );
+      }
 
       return {
         success: true,
         messageIds: [result.userMsg.id, result.assistantMsg.id],
-        summaryPending: false, // Always false while summary generation is disabled
+        summaryPending,
       };
     } catch (error) {
       const processingError =
@@ -147,7 +149,7 @@ export class MessageProcessor extends BaseService {
       return {
         success: false,
         messageIds: [],
-        summaryPending: false, // Always false while summary generation is disabled
+        summaryPending: false, // No summary pending on error
         error: {
           operation: processingError.operation,
           type: processingError.type,
@@ -183,22 +185,22 @@ export class MessageProcessor extends BaseService {
     const newCount = metadata.messageCount + 1;
     await this.updateConversationMetadata(conversationId, newCount);
 
-    // Temporarily disable summary generation
-    // if (
-    //   this.shouldGenerateSummary(newCount) &&
-    //   !this.hasPendingToolCalls(conversationId)
-    // ) {
-    //   logger.info('Triggering summary generation', {
-    //     conversationId,
-    //     messageCount: newCount,
-    //   });
-    //   this.triggerSummaryGeneration(conversationId, newCount).catch((error) =>
-    //     logger.error('Background summary generation failed:', {
-    //       error,
-    //       conversationId,
-    //     })
-    //   );
-    // }
+    // Check if we should generate a summary
+    if (
+      this.shouldGenerateSummary(newCount) &&
+      !this.hasPendingToolCalls(conversationId)
+    ) {
+      logger.info('Triggering summary generation', {
+        conversationId,
+        messageCount: newCount,
+      });
+      this.triggerSummaryGeneration(conversationId, newCount).catch((error) =>
+        logger.error('Background summary generation failed:', {
+          error,
+          conversationId,
+        })
+      );
+    }
 
     return storedMessage;
   }
@@ -237,10 +239,10 @@ export class MessageProcessor extends BaseService {
    * Find a complete tool call exchange in messages
    */
   private findCompleteExchange(messages: Message[]): CompleteExchange | null {
-    if (messages.length < 4) return null;
+    if (messages.length < 3) return null;
 
-    for (let i = messages.length - 4; i >= 0; i--) {
-      const sequence = messages.slice(i, i + 4);
+    for (let i = messages.length - 3; i >= 0; i--) {
+      const sequence = messages.slice(i, i + 3);
       if (this.isCompleteToolCallSequence(sequence)) {
         return {
           userMessage: sequence[0],
@@ -248,7 +250,7 @@ export class MessageProcessor extends BaseService {
             tool_calls: ToolCall[];
           },
           toolResponse: sequence[2],
-          finalAnswer: sequence[3],
+          finalAnswer: messages[i + 3],
         };
       }
     }
@@ -259,19 +261,35 @@ export class MessageProcessor extends BaseService {
    * Validate if a sequence of messages forms a complete tool call exchange
    */
   private isCompleteToolCallSequence(messages: Message[]): boolean {
-    if (messages.length !== 4) return false;
+    // Must have at least 3 messages for a complete exchange
+    if (messages.length < 3) return false;
 
-    const [user, assistant, tool, final] = messages;
+    // Check message sequence
+    for (let i = 0; i < messages.length - 2; i++) {
+      const current = messages[i];
+      const next = messages[i + 1];
+      const afterNext = messages[i + 2];
 
-    return (
-      user.role === 'user' &&
-      assistant.role === 'assistant' &&
-      Array.isArray(assistant.tool_calls) &&
-      assistant.tool_calls.length > 0 &&
-      tool.role === 'tool' &&
-      final.role === 'assistant' &&
-      !final.tool_calls
-    );
+      // Check for proper tool call sequence:
+      // 1. Assistant message with tool_calls
+      // 2. Tool response message
+      // 3. Assistant's final answer
+      if (
+        current.role === 'assistant' &&
+        Array.isArray(current.tool_calls) &&
+        current.tool_calls.length > 0 &&
+        next.role === 'tool' &&
+        afterNext.role === 'assistant'
+      ) {
+        // Verify tool response matches tool call
+        const toolCall = current.tool_calls[0];
+        if (toolCall && next.name === toolCall.function?.name) {
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 
   /**
