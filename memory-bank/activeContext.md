@@ -1,149 +1,128 @@
 # Active Context – Conversation Memory Implementation
 
-This section outlines our current work focus and the active decisions and considerations driving our implementation of the hierarchical conversation memory system.
+## Current Work Focus: Tool Call Loop Resolution
 
----
+We've successfully resolved a critical issue in our conversation memory system where tool calls were entering infinite loops. Here's our current implementation and findings:
 
-## Current Work Focus
+### Message Processing Improvements
 
-- **Hierarchical Conversation Memory**  
-  Implementing a multi-level memory system that combines raw message storage with summarized content:
+1. **Firebase Message Storage**
 
-  - **Immediate Context**: Maintain the last 5 raw messages in Firebase for real-time LLM prompts.
-  - **Recent & Global Summaries**: Generate and store summaries in Upstash VectorDB to capture conversation segments and the overall session.
+   - Leveraging Firebase's natural chronological ordering
+   - Removed unnecessary sorting/reordering of messages
+   - Using simple slice operations for message retrieval
 
-- **Topic Change Detection**  
-  Detect shifts in conversation themes using a combination of:
+2. **Tool Call Handling**
 
-  - **Semantic Similarity**: Compare new message embeddings with recent context.
-  - **Theme Classification**: Label messages with potential topics (e.g., mindfulness, entrepreneurship) to determine when a topic boundary occurs.
+   - Implemented MAX_TOOL_CALLS limit (3 calls)
+   - Added 30-second timeout for tool call sequences
+   - Enhanced progress tracking in loader messages
 
-- **Session Management**  
-  Managing conversation sessions through:
-  - **User-Initiated or Automatic Endings**: Sessions can be closed by user action or automatically after inactivity (e.g., 24 hours).
-  - **Data Association**: Each session links raw messages in Firebase with summary embeddings in Upstash for efficient retrieval.
+3. **System Prompt Optimization**
+   - Added explicit ONE tool call limit per response
+   - Clear instructions for handling insufficient information
+   - Emphasis on working with available data vs making additional queries
 
----
+### Key Findings
 
-## Active Decisions & Considerations
+1. **Message Ordering Impact**
 
-- **Data Storage & Retrieval Strategy**
+   - Previous: Sorting messages was disrupting conversation flow
+   - Now: Using Firebase's natural chronological order preserves context
+   - Result: LLM receives proper conversation history
 
-  - **Firebase Realtime Database**: Chosen for near real-time raw message storage and quick access to the most recent conversation turns.
-  - **Upstash VectorDB**: Utilized for storing summarized content and enabling fast, retrieval-based context augmentation.
+2. **Tool Call Behavior**
 
-- **Summarization Process**
+   - Previous: LLM making multiple calls trying to get "perfect" information
+   - Now: Single tool call with clear instructions to work with what's available
+   - Result: More efficient and stable conversation flow
 
-  - **Asynchronous Processing**: Summaries (both recent and global) are generated asynchronously via Cloud Functions to avoid interrupting the user experience.
-  - **Granularity Levels**: The system differentiates between immediate raw context, recent summaries (generated every 10–20 messages or upon a topic change), and overarching global summaries for overall session insights.
+3. **System Architecture**
+   ```mermaid
+   graph TD
+     A[User Message] --> B[Message Processor]
+     B --> C{Need Tool?}
+     C -->|Yes| D[Single Tool Call]
+     C -->|No| E[Direct Response]
+     D --> F[Process Result]
+     F --> G[Format Response]
+     G --> H[Return to User]
+   ```
 
-- **Topic Change Detection**
+### Active Decisions & Considerations
 
-  - **Threshold-Based Triggering**: A new topic is flagged when the semantic similarity between the current message and the previous context falls below a set threshold, or when theme classification indicates a shift.
-  - **Event-Driven Updates**: Topic change events trigger the finalization and storage of summaries for the outgoing segment, initiating a new segment for the conversation.
+1. **Message Retrieval Strategy**
 
-- **Performance & Scalability**
+   - Using Firebase's built-in ordering
+   - Minimal processing of message sequences
+   - Efficient slice operations for context windows
 
-  - **Latency Goals**: Aim to complete theme classification and embedding steps within 500ms to maintain a responsive system.
-  - **Token Efficiency**: Hierarchical summaries reduce prompt size and ensure that the LLM operates within optimal token limits.
-  - **Scalability**: The design anticipates high concurrency by efficiently sharding Firebase data by `conversation_id` and leveraging Upstash for rapid vector similarity searches.
+2. **Tool Call Management**
 
-- **Security & Cost Considerations**
-  - **Security Measures**: Enforce strict Firebase rules to ensure only authorized users can access and modify conversation data, along with encrypted transmission for sensitive data.
-  - **Cost Management**: Monitor Firebase read/write operations and Upstash query costs, as well as the expense associated with frequent summarization and embedding calls.
+   - Hard limits on consecutive calls
+   - Clear timeout boundaries
+   - Explicit instructions in system prompt
 
----
+3. **Performance & Reliability**
 
-This active context section captures our current priorities and the strategic decisions behind our hierarchical conversation memory system. It ensures that as we move forward, every team member is aligned on our objectives, technology choices, and performance targets.
+   - Reduced processing overhead
+   - More predictable conversation flow
+   - Better error handling and recovery
 
-### Conversation Memory System: Tool Call Loop Issue
+4. **Future Improvements**
+   - Consider implementing tool call caching
+   - Add more detailed logging for debugging
+   - Enhance error recovery mechanisms
 
-#### Current Work Focus
+### Implementation Details
 
-We are implementing a hierarchical conversation memory system that:
-
-1. Stores raw messages in Firebase
-2. Generates summaries at different levels:
-   - Immediate context (last 5 messages)
-   - Recent summary (every 10-20 messages)
-   - Global summary (entire session)
-3. Uses Upstash Vector for storing and retrieving summaries
-4. Handles topic changes and session management
-
-#### Recent Changes
-
-1. Integrated MessageProcessor with SummaryService
-2. Added tool call handling in message processing
-3. Implemented getMessagesForSummary to handle tool call sequences
-4. Updated message storage to preserve raw OpenAI response format
-
-#### Current Issue: Infinite Tool Call Loop
-
-The system is stuck in an infinite loop when handling tool calls:
-
-1. **Root Cause**:
-
-   - When assistant makes a tool call, before getting final answer:
-     ```
-     User: Question
-     Assistant: [Tool Call]
-     Tool: [Response]
-     ```
-   - Summary service sees this as incomplete exchange
-   - LLM tries to complete it with another tool call
-   - Process repeats indefinitely
-
-2. **Specific Problems**:
-   - `getMessagesForSummary` only looks for tool response, not final answer
-   - We're summarizing conversations mid-tool-call
-   - Raw OpenAI format in DB means LLM sees exact same context that triggered tool call
-
-#### Next Steps
-
-1. [ ] Modify `getMessagesForSummary`:
-
-   - Wait for complete exchange (User -> Assistant -> Tool -> Final Answer)
-   - Or skip summarizing incomplete tool call sequences
-
-2. [ ] Add exchange completion detection:
+1. **Message Retrieval**
 
    ```typescript
-   isCompleteExchange(messages: Message[]): boolean {
-     // Check if last message completes the exchange
-     // Either content or tool call -> response -> final answer
+   // Efficient message retrieval
+   const messages = await this.getData<Record<string, CreateMessage>>(
+     this.getConversationPath(conversationId, FIREBASE_PATHS.messages)
+   );
+   return Object.entries(messages)
+     .map(([messageId, messageData]) => ({
+       ...messageData,
+       id: messageId,
+     }))
+     .slice(-count);
+   ```
+
+2. **Tool Call Safety**
+
+   ```typescript
+   const MAX_TOOL_CALLS = 3;
+   const TIMEOUT_MS = 30000; // 30 seconds
+
+   // In processing loop
+   if (toolCallCount > MAX_TOOL_CALLS) {
+     return 'Maximum tool calls reached';
+   }
+   if (Date.now() - startTime > TIMEOUT_MS) {
+     return 'Request timed out';
    }
    ```
 
-3. [ ] Update summary triggers:
+### Next Steps
 
-   - Only summarize after complete exchanges
-   - Add safeguards against summarizing mid-tool-call
+1. **Monitoring & Analytics**
 
-4. [ ] Add tool call cycle detection:
-   - Track number of consecutive tool calls
-   - Break cycle if threshold exceeded
+   - Implement detailed logging of tool call patterns
+   - Track conversation completion rates
+   - Measure response time improvements
 
-#### Active Decisions and Considerations
+2. **System Hardening**
 
-1. **Summary Timing**:
+   - Add more edge case handling
+   - Enhance error recovery
+   - Implement circuit breakers for critical paths
 
-   - When is the best time to trigger summaries?
-   - How to handle long tool call chains?
-   - Should we wait for explicit "completion" signals?
+3. **Documentation**
+   - Update technical specifications
+   - Create troubleshooting guides
+   - Document best practices for tool usage
 
-2. **Tool Call Handling**:
-
-   - How many consecutive tool calls should we allow?
-   - Should we modify tool response format?
-   - How to handle failed tool calls in summaries?
-
-3. **Message Format**:
-
-   - Keep raw OpenAI format vs. transform for storage?
-   - How to handle format differences between storage and LLM?
-   - Balance between preserving context and preventing loops
-
-4. **Performance Impact**:
-   - Cost of additional message format checks
-   - Delay in summary generation
-   - Impact on conversation flow
+This active context reflects our current understanding and implementation of the conversation memory system, particularly focusing on the resolved tool call loop issue and its implications for system stability and performance.
