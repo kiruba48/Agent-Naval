@@ -215,24 +215,57 @@ export class MessageProcessor extends BaseService {
   ): Promise<Message[]> {
     logger.debug('Fetching messages for summary', { conversationId });
 
-    // Get last 14 messages to ensure we capture complete exchanges
+    // Get unsummarized messages first
+    const unsummarizedMessages = await this.conversationService.getUnsummarizedMessages(conversationId);
+    
+    // If we have enough unsummarized messages, use those
+    if (unsummarizedMessages.length >= 5) {
+      logger.debug('Using unsummarized messages for summary', {
+        conversationId,
+        messageCount: unsummarizedMessages.length,
+      });
+      return unsummarizedMessages;
+    }
+    
+    // Otherwise, get recent messages with context
     const messages = await this.conversationService.getLastMessages(
       conversationId,
       14
     );
-
+    
     // Find complete exchange
     const completeExchange = this.findCompleteExchange(messages);
     if (completeExchange) {
       logger.debug('Found complete tool call exchange', {
         conversationId,
         exchangeLength: 4,
+        unsummarizedCount: unsummarizedMessages.length,
       });
-      return messages.slice(-4); // Return the complete exchange
+      
+      // Include unsummarized messages plus the exchange for context
+      const exchangeMessages = messages.slice(-4);
+      
+      // Combine unsummarized messages with exchange messages, avoiding duplicates
+      const exchangeIds = new Set(exchangeMessages.map(msg => msg.id));
+      const uniqueUnsummarized = unsummarizedMessages.filter(msg => !exchangeIds.has(msg.id));
+      
+      return [...uniqueUnsummarized, ...exchangeMessages];
     }
-
-    // If no complete exchange found, return standard context size
-    return messages.slice(-10);
+    
+    // Include unsummarized messages plus recent context
+    logger.debug('Using standard context size for summary', {
+      conversationId,
+      contextSize: Math.min(10, messages.length),
+      unsummarizedCount: unsummarizedMessages.length,
+    });
+    
+    const recentMessages = messages.slice(-Math.min(10, messages.length));
+    
+    // Combine unsummarized messages with recent messages, avoiding duplicates
+    const recentIds = new Set(recentMessages.map(msg => msg.id));
+    const uniqueUnsummarized = unsummarizedMessages.filter(msg => !recentIds.has(msg.id));
+    
+    return [...uniqueUnsummarized, ...recentMessages];
   }
 
   /**

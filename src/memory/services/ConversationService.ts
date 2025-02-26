@@ -58,15 +58,17 @@ export class ConversationService extends BaseService {
       messageCount: 0,
     };
 
-    // Convert to Firebase storage format
-    const storageMetadata: FirebaseMetadata = {
-      ...metadata,
-      startTime: now.toISOString(),
-      lastActivity: now.toISOString(),
+    // Create a properly typed FirebaseMetadata object
+    // This is needed for TypeScript, even though our BaseService will handle
+    // the Date to string conversion automatically at runtime
+    const firebaseMetadata: FirebaseMetadata = {
+      ...metadata, // Copy all properties from metadata
+      startTime: now.toISOString(), // Override with string version
+      lastActivity: now.toISOString(), // Override with string version
     };
 
     const session: Partial<FirebaseStorageConversation> = {
-      metadata: storageMetadata,
+      metadata: firebaseMetadata,
       messages: {},
       topics: {},
       summaries: {},
@@ -110,14 +112,16 @@ export class ConversationService extends BaseService {
     await this.updateData(
       this.getConversationPath(conversationId, 'metadata'),
       {
-        lastActivity: new Date().toISOString(),
+        lastActivity: new Date(),
         messageCount: (await this.getMessageCount(conversationId)) + 1,
       }
     );
 
+    // Ensure timestamp is a Date object when returning
     return {
       ...message,
       id: messageId,
+      timestamp: this.ensureValidDate(message.timestamp),
     };
   }
 
@@ -137,18 +141,25 @@ export class ConversationService extends BaseService {
     const messageEntries = Object.entries(messages);
     const lastMessages = messageEntries.slice(-count);
 
+    // Convert messages, ensuring timestamps are Date objects
+    const convertMessage = ([id, msg]: [string, CreateMessage]): Message => ({
+      ...msg,
+      id,
+      timestamp: this.ensureValidDate(msg.timestamp),
+    });
+
     // If first message is a tool response, include the previous message
     if (lastMessages[0]?.[1].role === 'tool') {
       const previousMessage = messageEntries[messageEntries.length - count - 1];
       if (previousMessage) {
         return [
-          { ...previousMessage[1], id: previousMessage[0] },
-          ...lastMessages.map(([id, msg]) => ({ ...msg, id })),
+          convertMessage(previousMessage),
+          ...lastMessages.map(convertMessage),
         ];
       }
     }
 
-    return lastMessages.map(([id, msg]) => ({ ...msg, id }));
+    return lastMessages.map(convertMessage);
   }
 
   /**
@@ -202,11 +213,15 @@ export class ConversationService extends BaseService {
       return [];
     }
 
-    // Convert to array and get range, preserving Firebase's natural chronological order
-    const messageArray = Object.entries(messages).map(([id, msg]) => ({
+    // Convert messages, ensuring timestamps are Date objects
+    const convertMessage = ([id, msg]: [string, CreateMessage]): Message => ({
       ...msg,
       id,
-    }));
+      timestamp: this.ensureValidDate(msg.timestamp),
+    });
+
+    // Convert to array and get range, preserving Firebase's natural chronological order
+    const messageArray = Object.entries(messages).map(convertMessage);
 
     return messageArray.slice(startIndex, endIndex);
   }
@@ -247,6 +262,60 @@ export class ConversationService extends BaseService {
     );
   }
 
+  /**
+   * Get messages that haven't been included in a summary yet
+   */
+  async getUnsummarizedMessages(conversationId: string): Promise<Message[]> {
+    const messagesPath = this.getConversationPath(conversationId, FIREBASE_PATHS.messages);
+    const snapshot = await this.getData<Record<string, CreateMessage>>(messagesPath);
+    
+    if (!snapshot) {
+      logger.warn('No messages found for conversation', { conversationId });
+      return [];
+    }
+    
+    // Convert to array and filter for unsummarized messages
+    const messageEntries = Object.entries(snapshot);
+    const unsummarizedMessages = messageEntries
+      .filter(([_, msg]) => msg.summarized !== true)
+      .map(([id, msg]) => ({
+        ...msg,
+        id,
+        timestamp: this.ensureValidDate(msg.timestamp),
+      }));
+    
+    logger.debug('Retrieved unsummarized messages', { 
+      conversationId, 
+      count: unsummarizedMessages.length,
+      totalMessages: messageEntries.length
+    });
+    
+    return unsummarizedMessages;
+  }
+
+  /**
+   * Ensure a timestamp is a valid Date object
+   * @param timestamp The timestamp to validate
+   * @returns A valid Date object
+   */
+  private ensureValidDate(timestamp: any): Date {
+    // Use the base implementation through convertTimestamps
+    const convertedValue = this.convertTimestamps(timestamp);
+    
+    // If conversion resulted in a Date, return it
+    if (convertedValue instanceof Date) {
+      return convertedValue;
+    }
+    
+    // If conversion didn't result in a Date, create a new one
+    // This can happen if the timestamp wasn't in ISO format
+    logger.warn('Timestamp not converted to Date by base implementation', {
+      type: typeof timestamp,
+      value: typeof timestamp === 'object' ? JSON.stringify(timestamp) : timestamp
+    });
+    return new Date();
+  }
+
   private async getMessageCount(conversationId: string): Promise<number> {
     const metadata = await this.getMetadata(conversationId);
     return metadata.messageCount;
@@ -270,8 +339,8 @@ export class ConversationService extends BaseService {
         id,
         metadata: {
           ...conv.metadata,
-          startTime: new Date(conv.metadata.startTime),
-          lastActivity: new Date(conv.metadata.lastActivity),
+          startTime: this.ensureValidDate(conv.metadata.startTime),
+          lastActivity: this.ensureValidDate(conv.metadata.lastActivity),
         },
         context: {
           immediate: [],

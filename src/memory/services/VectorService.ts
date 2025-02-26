@@ -61,17 +61,29 @@ class VectorService extends BaseService {
      * Get or initialize an index
      */
     private async getIndex(indexName: string): Promise<Index> {
+        // First try exact match
         let index = this.indices.get(indexName);
         if (!index) {
-            const config = VECTOR_INDICES[indexName];
-            if (!config) {
+            // Try case-insensitive match
+            const upperIndexName = indexName.toUpperCase();
+            const configKey = Object.keys(VECTOR_INDICES).find(
+                key => key.toUpperCase() === upperIndexName
+            );
+            
+            if (!configKey) {
                 throw new Error(`Vector index ${indexName} not found in configuration`);
             }
+            
+            const config = VECTOR_INDICES[configKey];
             index = new Index({
                 url: config.url,
                 token: config.token
             });
+            
+            // Store with the original indexName for future lookups
             this.indices.set(indexName, index);
+            
+            logger.info(`Initialized vector index ${indexName} using config for ${configKey}`);
         }
         return index;
     }

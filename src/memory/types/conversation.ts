@@ -25,10 +25,11 @@ export interface Message {
  * Excludes function calls and other metadata not needed for summarizing content.
  */
 export interface SummaryReadyMessage {
-  role: 'user' | 'assistant'; // Only user and assistant messages are relevant for summaries
+  role: 'user' | 'assistant' | 'tool'; // Include tool messages in summaries
   content: string | null; // The actual message content
   timestamp: Date; // When the message was sent
   themes?: string[]; // Themes associated with the message
+  name?: string; // Tool name for tool messages
 }
 
 export interface ConversationContext {

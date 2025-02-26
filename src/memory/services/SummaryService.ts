@@ -7,6 +7,7 @@ import { vectorService } from './VectorService';
 import { logger } from '../../utils/logger';
 import { VECTOR_INDICES } from '../constants/vector';
 import { generateText, LLAMA_70B } from '../../llm';
+import { FIREBASE_PATHS } from '../constants/config';
 
 interface SummaryData {
   summary_text: string;
@@ -57,6 +58,29 @@ export class SummaryService extends BaseService {
   }
 
   /**
+   * Ensure a timestamp is a valid Date object
+   * @param timestamp The timestamp to validate
+   * @returns A valid Date object
+   */
+  private ensureValidDate(timestamp: any): Date {
+    // Use the base implementation through convertTimestamps
+    const convertedValue = this.convertTimestamps(timestamp);
+    
+    // If conversion resulted in a Date, return it
+    if (convertedValue instanceof Date) {
+      return convertedValue;
+    }
+    
+    // If conversion didn't result in a Date, create a new one
+    // This can happen if the timestamp wasn't in ISO format
+    logger.warn('Timestamp not converted to Date by base implementation', {
+      type: typeof timestamp,
+      value: typeof timestamp === 'object' ? JSON.stringify(timestamp) : timestamp
+    });
+    return new Date();
+  }
+
+  /**
    * Generate and store a recent summary in vector store
    */
   async generateRecentSummary(
@@ -71,14 +95,38 @@ export class SummaryService extends BaseService {
     });
 
     try {
+      // Validate message count
+      if (messages.length < 2) {
+        logger.warn('Not enough messages to generate summary', {
+          conversationId,
+          messageCount: messages.length
+        });
+        throw new Error('Not enough messages to generate summary');
+      }
+      
+      // Validate timestamps
+      messages.forEach((msg, index) => {
+        try {
+          // Use ensureValidDate to validate and fix timestamps
+          msg.timestamp = this.ensureValidDate(msg.timestamp);
+        } catch (error) {
+          logger.warn('Error validating timestamp', {
+            conversationId,
+            messageIndex: index,
+            error: error instanceof Error ? error.message : String(error)
+          });
+        }
+      });
+
       // Filter and transform messages to summary-ready format
       const summaryReadyMessages = messages
-        .filter((msg) => msg.role === 'user' || msg.role === 'assistant')
+        .filter((msg) => msg.role === 'user' || msg.role === 'assistant' || msg.role === 'tool')
         .map((msg) => ({
-          role: msg.role as 'user' | 'assistant',
-          content: msg.content,
-          timestamp: msg.timestamp,
+          role: msg.role as 'user' | 'assistant' | 'tool',
+          content: msg.role === 'tool' ? this.transformToolContent(msg) : msg.content,
+          timestamp: this.ensureValidDate(msg.timestamp),
           themes: msg.themes,
+          name: msg.role === 'tool' ? msg.name : undefined
         }));
 
       // Generate summary text
@@ -91,8 +139,8 @@ export class SummaryService extends BaseService {
         metadata: {
           conversationId,
           messageCount: messages.length,
-          startTime: messages[0].timestamp.toISOString(),
-          endTime: messages[messages.length - 1].timestamp.toISOString(),
+          startTime: this.ensureValidDate(messages[0].timestamp).toISOString(),
+          endTime: this.ensureValidDate(messages[messages.length - 1].timestamp).toISOString(),
         },
       };
 
@@ -107,8 +155,8 @@ export class SummaryService extends BaseService {
             summaryId: crypto.randomUUID(),
             conversationId,
             messageCount: messages.length,
-            startTime: messages[0].timestamp.toISOString(),
-            endTime: messages[messages.length - 1].timestamp.toISOString(),
+            startTime: this.ensureValidDate(messages[0].timestamp).toISOString(),
+            endTime: this.ensureValidDate(messages[messages.length - 1].timestamp).toISOString(),
             themes: Array.from(new Set(themes)),
             significantInsights: [],
             userPreferences: {},
@@ -121,6 +169,9 @@ export class SummaryService extends BaseService {
         vectorId,
         timing: Date.now() - startTime,
       });
+
+      // Mark messages as summarized
+      await this.markMessagesAsSummarized(conversationId, messages);
 
       return {
         id: vectorId,
@@ -144,21 +195,28 @@ export class SummaryService extends BaseService {
   }
 
   /**
-   * Generate a timestamp range string for a set of messages
+   * Get a formatted timestamp range for the messages
    */
   private getTimestampRange(messages: Message[]): string {
-    if (messages.length === 0) return '';
+    if (!messages.length) return 'No messages';
+    
+    try {
+      const startTime = this.ensureValidDate(messages[0].timestamp);
+      const endTime = this.ensureValidDate(messages[messages.length - 1].timestamp);
+      
+      // If same day, show times only
+      if (startTime.toDateString() === endTime.toDateString()) {
+        return `${startTime.toLocaleTimeString()} - ${endTime.toLocaleTimeString()}`;
+      }
 
-    const startTime = messages[0].timestamp;
-    const endTime = messages[messages.length - 1].timestamp;
-
-    // If same day, show times only
-    if (startTime.toDateString() === endTime.toDateString()) {
-      return `${startTime.toLocaleTimeString()} - ${endTime.toLocaleTimeString()}`;
+      // Different days, show dates and times
+      return `${startTime.toLocaleString()} - ${endTime.toLocaleString()}`;
+    } catch (error) {
+      logger.warn('Error generating timestamp range', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+      return 'Timestamp range unavailable';
     }
-
-    // Different days, show dates and times
-    return `${startTime.toLocaleString()} - ${endTime.toLocaleString()}`;
   }
 
   /**
@@ -167,8 +225,8 @@ export class SummaryService extends BaseService {
   private formatMessagesForSummary(messages: SummaryReadyMessage[]): string {
     return messages
       .map((msg) => {
-        const role = msg.role === 'user' ? 'User' : 'Assistant';
-        const timestamp = new Date(msg.timestamp).toISOString();
+        const role = msg.role === 'user' ? 'User' : msg.role === 'assistant' ? 'Assistant' : `Tool: ${msg.name}`;
+        const timestamp = this.ensureValidDate(msg.timestamp).toISOString();
         return `[${timestamp}] ${role}: ${msg.content}`;
       })
       .join('\n\n');
@@ -199,10 +257,8 @@ Summary:`;
 
       logger.info('Generating summary using LLM', {
         messageCount: messages.length,
-        firstMessageTime: new Date(messages[0].timestamp).toISOString(),
-        lastMessageTime: new Date(
-          messages[messages.length - 1].timestamp
-        ).toISOString(),
+        firstMessageTime: this.ensureValidDate(messages[0].timestamp).toISOString(),
+        lastMessageTime: this.ensureValidDate(messages[messages.length - 1].timestamp).toISOString(),
       });
 
       const summary = await generateText(prompt, LLAMA_70B);
@@ -229,33 +285,35 @@ Summary:`;
    * Transform raw messages into a format optimized for summarization.
    * Reuses MessageProcessor's getMessagesForSummary for consistent message filtering.
    */
-  private async prepareMessagesForSummary(
-    conversationId: string
-  ): Promise<SummaryReadyMessage[]> {
+  public prepareMessagesForSummary(
+    messages: Message[]
+  ): SummaryReadyMessage[] {
     try {
-      // Get filtered messages using existing logic
-      const messages = await this.getMessageProcessor().getMessagesForSummary(
-        conversationId
-      );
-
-      logger.debug('Retrieved messages for summarization', {
-        conversationId,
-        messageCount: messages.length,
+      // Validate timestamps
+      messages.forEach((msg, index) => {
+        try {
+          // Use ensureValidDate to validate and fix timestamps
+          msg.timestamp = this.ensureValidDate(msg.timestamp);
+        } catch (error) {
+          logger.warn('Error validating timestamp', {
+            messageIndex: index,
+            error: error instanceof Error ? error.message : String(error)
+          });
+        }
       });
 
       // Transform messages into summary-ready format
-      // Filter out system messages and ensure only user/assistant messages are included
       return messages
-        .filter((msg) => msg.role === 'user' || msg.role === 'assistant')
+        .filter((msg) => msg.role === 'user' || msg.role === 'assistant' || msg.role === 'tool')
         .map((msg) => ({
-          role: msg.role as 'user' | 'assistant',
-          content: msg.content,
-          timestamp: msg.timestamp,
+          role: msg.role as 'user' | 'assistant' | 'tool',
+          content: msg.role === 'tool' ? this.transformToolContent(msg) : msg.content,
+          timestamp: this.ensureValidDate(msg.timestamp),
           themes: msg.themes,
+          name: msg.role === 'tool' ? msg.name : undefined
         }));
     } catch (error) {
       logger.error('Failed to prepare messages for summary', {
-        conversationId,
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
@@ -332,11 +390,8 @@ Summary:`;
             conversationId,
             summaryCount: recentSummaries.length,
             timeRange: {
-              startTime: recentSummaries[0].timestamp.toISOString(),
-              endTime:
-                recentSummaries[
-                  recentSummaries.length - 1
-                ].timestamp.toISOString(),
+              startTime: this.ensureValidDate(recentSummaries[0].timestamp).toISOString(),
+              endTime: this.ensureValidDate(recentSummaries[recentSummaries.length - 1].timestamp).toISOString(),
             },
           },
         }
@@ -366,6 +421,141 @@ Summary:`;
         timing: Date.now() - startTime,
       });
       throw error;
+    }
+  }
+
+  /**
+   * Transform tool message content to a more summary-friendly format
+   */
+  private transformToolContent(message: Message): string {
+    if (!message.name || !message.content) {
+      return 'Tool was called (no details available)';
+    }
+
+    try {
+      // For knowledge retrieval tool
+      if (message.name === 'queryKnowledgeBase' && typeof message.content === 'string') {
+        return this.summarizeKnowledgeRetrieval(message.content);
+      }
+      
+      // For other tools or non-JSON content, truncate if too long
+      if (typeof message.content === 'string' && message.content.length > 100) {
+        return `${message.content.substring(0, 100)}... (content truncated)`;
+      }
+      
+      // Otherwise return as is
+      return message.content;
+    } catch (error) {
+      logger.warn('Error transforming tool content', {
+        toolName: message.name,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      return `Tool '${message.name}' was called (content could not be parsed)`;
+    }
+  }
+
+  /**
+   * Summarize knowledge retrieval results
+   */
+  private summarizeKnowledgeRetrieval(content: string): string {
+    try {
+      const data = JSON.parse(content);
+      
+      // Check if we have results
+      if (!Array.isArray(data.results) || data.results.length === 0) {
+        return 'Knowledge retrieval found no results';
+      }
+      
+      const resultCount = data.results.length;
+      const totalResults = data.totalResults || resultCount;
+      
+      // Extract all themes from all results
+      const allThemes = new Set<string>();
+      const sourceFiles = new Set<string>();
+      
+      data.results.forEach((result: any) => {
+        // Add themes
+        if (result.metadata?.themes) {
+          result.metadata.themes.forEach((theme: string) => allThemes.add(theme));
+        }
+        
+        // Add source files
+        if (result.metadata?.sourceFile) {
+          sourceFiles.add(result.metadata.sourceFile.split('/').pop()); // Just the filename
+        }
+      });
+      
+      // Get a preview of the first result's content
+      const firstResultPreview = data.results[0]?.content
+        ? data.results[0].content.substring(0, 60).trim() + '...'
+        : 'No content preview available';
+      
+      // Format the summary
+      let summary = `Knowledge retrieval found ${resultCount} results`;
+      
+      if (totalResults > resultCount) {
+        summary += ` (out of ${totalResults} total)`;
+      }
+      
+      // Add themes if available
+      if (allThemes.size > 0) {
+        const themeList = Array.from(allThemes).slice(0, 3).join(', ');
+        summary += ` on themes: ${themeList}${allThemes.size > 3 ? '...' : ''}`;
+      }
+      
+      // Add source files if there are multiple
+      if (sourceFiles.size > 0) {
+        const fileList = Array.from(sourceFiles).slice(0, 2).join(', ');
+        summary += ` from ${sourceFiles.size} source${sourceFiles.size > 1 ? 's' : ''}: ${fileList}${sourceFiles.size > 2 ? '...' : ''}`;
+      }
+      
+      // Add content preview
+      summary += `\nPreview: "${firstResultPreview}"`;
+      
+      return summary;
+    } catch (error) {
+      logger.warn('Error summarizing knowledge retrieval', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+      return 'Knowledge retrieval was performed (details unavailable)';
+    }
+  }
+
+  /**
+   * Mark messages as summarized to prevent duplicate summarization
+   */
+  private async markMessagesAsSummarized(
+    conversationId: string,
+    messages: Message[]
+  ): Promise<void> {
+    if (messages.length === 0) return;
+    
+    try {
+      const updates: Record<string, boolean> = {};
+      
+      // Create a batch update for all messages
+      messages.forEach(msg => {
+        if (msg.id) {
+          updates[`${FIREBASE_PATHS.messages}/${msg.id}/summarized`] = true;
+        }
+      });
+      
+      // Apply the updates to Firebase
+      if (Object.keys(updates).length > 0) {
+        await this.updateData(`${FIREBASE_PATHS.conversations}/${conversationId}`, updates);
+        
+        logger.debug('Marked messages as summarized', {
+          conversationId,
+          messageCount: Object.keys(updates).length
+        });
+      }
+    } catch (error) {
+      logger.error('Failed to mark messages as summarized', {
+        conversationId,
+        error: error instanceof Error ? error.message : String(error),
+        messageCount: messages.length
+      });
+      // Don't throw - this is a non-critical operation
     }
   }
 }

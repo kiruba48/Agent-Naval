@@ -158,7 +158,7 @@ export async function queryVectorStore(query: string, collectionName: string, th
         })
     });
 
-    console.log('Raw results from Upstash:', JSON.stringify(results, null, 2));
+    // console.log('Raw results from Upstash:', JSON.stringify(results, null, 2));
 
     return results.map(result => {
         if (!result.metadata || typeof result.metadata !== 'object') {

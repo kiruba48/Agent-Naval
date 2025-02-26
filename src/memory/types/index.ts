@@ -21,6 +21,7 @@ export interface CreateMessage {
     }>;
     tool_call_id?: string;
     name?: string;
+    summarized?: boolean; // Whether this message has been included in a summary
 }
 
 export interface CreateSummary {
@@ -40,6 +41,7 @@ export interface CreateSummary {
  */
 export interface Message extends CreateMessage {
     id: string;
+    summarized?: boolean; // Whether this message has been included in a summary
 }
 
 export interface TopicSegment {

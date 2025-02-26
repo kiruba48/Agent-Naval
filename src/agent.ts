@@ -38,23 +38,23 @@ export const runAgent = async ({
       // Get conversation history
       const history = await conversationService.getLastMessages(conversationId);
 
-      logger.debug('Conversation history structure', {
-        messages: history.map((msg) => ({
-          role: msg.role,
-          has_tool_calls: !!msg.tool_calls,
-          has_content: !!msg.content,
-          tool_calls_count: msg.tool_calls?.length,
-        })),
-      });
+      //   logger.debug('Conversation history structure', {
+      //     messages: history.map((msg) => ({
+      //       role: msg.role,
+      //       has_tool_calls: !!msg.tool_calls,
+      //       has_content: !!msg.content,
+      //       tool_calls_count: msg.tool_calls?.length,
+      //     })),
+      //   });
 
-      logger.debug('Conversation history for OpenAI', {
-        history_length: history.length,
-        last_message: history[history.length - 1],
-        tool_calls: history.filter(
-          (msg) => msg.role === 'assistant' && msg.tool_calls
-        ).length,
-        tool_responses: history.filter((msg) => msg.role === 'tool').length,
-      });
+      //   logger.debug('Conversation history for OpenAI', {
+      //     history_length: history.length,
+      //     last_message: history[history.length - 1],
+      //     tool_calls: history.filter(
+      //       (msg) => msg.role === 'assistant' && msg.tool_calls
+      //     ).length,
+      //     tool_responses: history.filter((msg) => msg.role === 'tool').length,
+      //   });
 
       // Get LLM response
       const response = await runLLM({
@@ -62,15 +62,15 @@ export const runAgent = async ({
         tools,
       });
 
-      logger.debug('Raw LLM Response', {
-        response: JSON.stringify(response, null, 2),
-      });
+      //   logger.debug('Raw LLM Response', {
+      //     response: JSON.stringify(response, null, 2),
+      //   });
 
-      logger.debug('LLM Response', {
-        has_content: !!response.content,
-        has_tool_calls: !!response.tool_calls,
-        tool_calls_count: response.tool_calls?.length,
-      });
+      //   logger.debug('LLM Response', {
+      //     has_content: !!response.content,
+      //     has_tool_calls: !!response.tool_calls,
+      //     tool_calls_count: response.tool_calls?.length,
+      //   });
 
       // Save raw LLM response to conversation history
       await messageProcessor.addMessage(conversationId, {
@@ -80,10 +80,10 @@ export const runAgent = async ({
 
       // First check if we have a direct answer
       if (response.content) {
-        logger.debug('Processing assistant message', {
-          content: response.content,
-        });
-        logMessage(response);
+        // logger.debug('Processing assistant message', {
+        //   content: response.content,
+        // });
+        // logMessage(response);
         loader.stop();
         return response.content;
       }
@@ -117,19 +117,20 @@ export const runAgent = async ({
           });
 
           const result = await runTool(toolCall, userMessage);
-          
+
           // Format the tool response into a string
-          const formattedResult = typeof result === 'string' 
-            ? result 
-            : JSON.stringify(result, null, 2);
-          
+          const formattedResult =
+            typeof result === 'string'
+              ? result
+              : JSON.stringify(result, null, 2);
+
           // Add tool response with proper structure
           await messageProcessor.addMessage(conversationId, {
             role: 'tool',
             name: toolCall.function.name,
             content: formattedResult,
             timestamp: new Date(),
-            tool_call_id: toolCall.id // Important: Link response to specific tool call
+            tool_call_id: toolCall.id, // Important: Link response to specific tool call
           });
         }
       }
