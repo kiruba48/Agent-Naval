@@ -4,6 +4,7 @@ import { SummaryReadyMessage } from '../types/conversation';
 import { SUMMARY_TYPES } from '../constants/config';
 import { MessageProcessor } from './MessageProcessor';
 import { vectorService } from './VectorService';
+import { conversationService } from './ConversationService';
 import { logger } from '../../utils/logger';
 import { VECTOR_INDICES } from '../constants/vector';
 import { generateText, LLAMA_70B } from '../../llm';
@@ -58,6 +59,23 @@ export class SummaryService extends BaseService {
   }
 
   /**
+   * Get the user ID for a conversation
+   */
+  private async getUserId(conversationId: string): Promise<string> {
+    try {
+      // Access the conversation metadata directly from the conversationService
+      const metadata = await conversationService.getMetadata(conversationId);
+      return metadata.userId;
+    } catch (error) {
+      logger.error('Failed to get user ID for conversation', {
+        conversationId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Ensure a timestamp is a valid Date object
    * @param timestamp The timestamp to validate
    * @returns A valid Date object
@@ -103,6 +121,9 @@ export class SummaryService extends BaseService {
         });
         throw new Error('Not enough messages to generate summary');
       }
+      
+      // Get the user ID for this conversation
+      const userId = await this.getUserId(conversationId);
       
       // Validate timestamps
       messages.forEach((msg, index) => {
@@ -154,6 +175,7 @@ export class SummaryService extends BaseService {
             type: SUMMARY_TYPES.recent,
             summaryId: crypto.randomUUID(),
             conversationId,
+            userId, // Add user ID to metadata
             messageCount: messages.length,
             startTime: this.ensureValidDate(messages[0].timestamp).toISOString(),
             endTime: this.ensureValidDate(messages[messages.length - 1].timestamp).toISOString(),
@@ -334,6 +356,9 @@ Summary:`;
     });
 
     try {
+      // Get the user ID for this conversation
+      const userId = await this.getUserId(conversationId);
+      
       // Combine recent summaries into a global summary
       const combinedContent = recentSummaries
         .map((s) => s.content)
@@ -388,6 +413,7 @@ Summary:`;
             type: SUMMARY_TYPES.global,
             summaryId: crypto.randomUUID(),
             conversationId,
+            userId, // Add user ID to metadata
             summaryCount: recentSummaries.length,
             timeRange: {
               startTime: this.ensureValidDate(recentSummaries[0].timestamp).toISOString(),
