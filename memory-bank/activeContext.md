@@ -1,151 +1,97 @@
-# Active Context – Message Handling, Tool Response, and Timestamp Processing
+# Active Context – Memory System and Vector Retrieval
 
-## Current Work Focus: Tool Response Context, Message Display, and Data Type Handling
+## Current Work Focus: Summary Generation and Vector-Based Context Retrieval
 
-We've successfully resolved several key issues in our conversation system:
+We're currently addressing several issues in our memory system, particularly around summary generation and vector-based context retrieval:
 
-### 1. Tool Response Context Resolution
+### 1. Vector Retrieval Issues
 
 1. **Problem Identified**
+   - Querying the vector database results in "No relevant conversation history available"
+   - Summaries are being generated and stored in Upstash Vector but not being retrieved
+   - Example metadata shows summaries exist for the same user and conversation:
+   ```json
+   {"timestamp":"2025-03-02T10:23:15.403Z","type":"recent","summaryId":"622f7267-7eb7-4b3a-9385-c131ded93160","conversationId":"-OKLMGQmjgIWHhSzrldc","userId":"jL1U6aGVImdnz4oRjLYKCRenhYO2","messageCount":10,"startTime":"2025-03-02T10:20:16.652Z","endTime":"2025-03-02T10:23:11.800Z","themes":[],"significantInsights":[],"userPreferences":{}}
+   ```
 
-   - Tool responses were getting disconnected from their tool calls
-   - Error: "messages with role 'tool' must be a response to a preceeding message with 'tool_calls'"
+2. **Root Causes Identified**
+   - `includeData: false` in vector query options (preventing text content retrieval)
+   - Similarity threshold set too high (0.7) for effective retrieval
+   - Conversation-specific filtering limiting cross-conversation memory
+   - Hybrid query mode might not be optimal for our use case
 
-2. **Solution Implemented**
+3. **Solutions Implemented**
+   - Changed `includeData: false` to `includeData: true` in VectorService
+   - Lowered similarity threshold from 0.7 to 0.5 in DEFAULT_QUERY_OPTIONS
+   - Added more comprehensive debug logging to track vector search results
 
+4. **Remaining Issues**
+   - Cross-conversation memory still limited by conversationId filter
+   - Query relevance might need further optimization
+   - Data structure mismatch between storage and retrieval formats
+
+### 2. Summary Generation Issues
+
+1. **Problem Identified**
+   - Summary generation only triggered when tool calls are involved
+   - Conversations without tool calls don't generate summaries
+   - This limits the effectiveness of our memory system
+
+2. **Root Causes Identified**
+   - The `hasPendingToolCalls()` check prevents summary generation
+   - `shouldGenerateSummary()` only triggers at exact multiples of the chunk size
+   - `processPendingMessages()` is only called in the direct answer path
+   - Tool call counter management has edge cases
+
+3. **Proposed Solutions**
+   - Modify `shouldGenerateSummary()` to be more flexible:
    ```typescript
-   async getLastMessages(conversationId: string, count: number): Promise<Message[]> {
-     const messages = await this.getData<Record<string, CreateMessage>>(
-       this.getConversationPath(conversationId, FIREBASE_PATHS.messages)
-     );
-
-     if (!messages) return [];
-
-     const messageEntries = Object.entries(messages);
-     const lastMessages = messageEntries.slice(-count);
-
-     // If first message is a tool response, include the previous message
-     if (lastMessages[0]?.[1].role === 'tool') {
-       const previousMessage = messageEntries[messageEntries.length - count - 1];
-       if (previousMessage) {
-         return [
-           { ...previousMessage[1], id: previousMessage[0] },
-           ...lastMessages.map(([id, msg]) => ({ ...msg, id })),
-         ];
-       }
+   private shouldGenerateSummary(messageCount: number): boolean {
+     // Generate summary when message count is divisible by chunk size
+     // OR when message count exceeds a minimum threshold
+     return messageCount % this.config.summaryChunkSize === 0 || 
+            (messageCount >= 5 && messageCount % this.config.summaryChunkSize <= 3);
+   }
+   ```
+   
+   - Add force parameter to `processPendingMessages()`:
+   ```typescript
+   public async processPendingMessages(
+     conversationId: string,
+     forceGeneration: boolean = false
+   ): Promise<void> {
+     // Check if we should generate a summary
+     if (
+       (this.shouldGenerateSummary(metadata.messageCount) || forceGeneration) &&
+       (!this.hasPendingToolCalls(conversationId) || forceGeneration)
+     ) {
+       // Generate summary...
      }
-
-     return lastMessages.map(([id, msg]) => ({ ...msg, id }));
    }
    ```
-
-3. **Key Improvements**
-   - Maintains tool call context by including previous message when needed
-   - Leverages Firebase's natural chronological ordering
-   - Simple and efficient implementation
-   - No unnecessary sorting or reordering
-
-### 2. Message Display Handling
-
-1. **Current Implementation**
-
-   - Messages are displayed twice in different formats:
-     - Debug format with "[ASSISTANT]" prefix
-     - User-friendly format with "💡 AI Response:"
-   - Decision made to keep both for debugging and UX purposes
-
-2. **Benefits**
-   - Clear technical logging for debugging
-   - Enhanced user experience with formatted output
-   - Helps track conversation flow and tool usage
-
-### 3. Timestamp Handling in Data Processing
-
-1. **Implementation Analysis**
-
-   - The `convertTimestamps` method in `BaseService` handles various timestamp formats:
-     - ISO string timestamps
-     - Numeric timestamps (milliseconds since epoch)
-     - Firebase timestamp objects (with seconds/nanoseconds)
-
+   
+   - Call `processPendingMessages()` at the end of agent execution:
    ```typescript
-   // Handle numeric timestamps (milliseconds since epoch)
-   if (typeof data === 'number' && !isNaN(data)) {
-       // Check if it's a reasonable timestamp (between 2000 and 2100)
-       const year2000 = 946684800000; // Jan 1, 2000
-       const year2100 = 4102444800000; // Jan 1, 2100
-       
-       if (data > year2000 && data < year2100) {
-           return new Date(data) as unknown as T;
-       }
-       return data;
-   }
+   // At the end of the while loop in agent.ts
+   await messageProcessor.processPendingMessages(conversationId, true);
    ```
 
-2. **Key Design Decisions**
-   - Numeric values are only converted to Date objects if they fall within a reasonable timestamp range (2000-2100)
-   - This prevents arbitrary numbers from being incorrectly interpreted as timestamps
-   - Maintains data integrity by preserving non-timestamp numeric values
-   - Aligns with Firebase's timestamp handling patterns
-   - Ensures consistent date handling throughout the application
+## Next Steps
 
-3. **Validation Logic**
-   - Explicit range validation (year 2000 to 2100) prevents false positives
-   - Preserves numeric values that aren't timestamps (e.g., counts, metrics, IDs)
-   - Handles edge cases gracefully without data corruption
-   - Provides type safety while maintaining flexibility
+1. **Vector Retrieval Enhancement**
+   - Remove conversationId filter to enable cross-conversation memory
+   - Experiment with different query modes (DENSE vs HYBRID)
+   - Test with direct queries that match known summary content
+   - Ensure consistent data structure between storage and retrieval
 
-4. **Integration with Firebase**
-   - Properly handles Firebase's server timestamp objects (seconds/nanoseconds format)
-   - Converts Firebase timestamps to JavaScript Date objects for consistent usage
-   - Maintains compatibility with Firebase's data model
-   - Ensures timestamps are correctly stored and retrieved
+2. **Summary Generation Improvement**
+   - Implement the proposed changes to `shouldGenerateSummary()`
+   - Add force parameter to `processPendingMessages()`
+   - Ensure summary generation at the end of all conversations
+   - Add more comprehensive logging around summary generation
 
-### Active Decisions & Considerations
-
-1. **Message Retrieval Strategy**
-
-   - Using Firebase's built-in chronological ordering
-   - Simple slice operations for message windows
-   - Tool response context preservation
-   - Efficient memory usage with targeted retrieval
-
-2. **Display Strategy**
-
-   - Maintaining both technical and user-friendly output
-   - Clear distinction between different message types
-   - Preserved debugging capability
-   - Consistent formatting for improved readability
-
-3. **Data Type Safety**
-   - Careful handling of timestamps across different formats
-   - Range validation for numeric timestamps
-   - Consistent conversion to JavaScript Date objects
-   - Preservation of original data when appropriate
-   - Explicit type checking to prevent runtime errors
-
-4. **Tool Call Management**
-   - Proper linking between tool calls and responses
-   - Maintained within conversation context
-   - Efficient retrieval and display
-   - Clear error handling for failed tool calls
-
-### Next Steps
-
-1. **Potential Improvements**
-
-   - Consider caching frequently used tool responses
-   - Optimize message window size based on context
-   - Enhance error handling for edge cases
-   - Further refinement of timestamp handling for edge cases
-   - Implement more comprehensive validation for complex data structures
-
-2. **Future Considerations**
-   - Message compression for long conversations
-   - Smarter context window management
-   - Enhanced logging and monitoring
-   - Advanced data type validation and conversion
-   - Performance optimization for large message volumes
-   - Improved error recovery mechanisms
-
-This active context reflects our current understanding and implementation of the conversation system, particularly focusing on tool response handling, message display, and data type processing. These improvements have enhanced both system stability and user experience while ensuring data integrity.
+3. **Testing and Validation**
+   - Verify summary generation across different conversation patterns
+   - Test vector retrieval with various query types
+   - Validate cross-conversation memory functionality
+   - Measure performance impact of more frequent summary generation
