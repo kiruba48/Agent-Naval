@@ -9,6 +9,7 @@ interface QueryOptions {
     filter?: {
         userId?: string;
         sessionId?: string;
+        conversationId?: string;
         timeRange?: {
             start: Date;
             end: Date;
@@ -17,10 +18,11 @@ interface QueryOptions {
 }
 
 interface SimilaritySearchResult {
-    id: string | number;
+    id: string;
     score: number;
     vector: number[];
     metadata: VectorMetadata;
+    data?: string;
 }
 
 /**
@@ -169,7 +171,7 @@ class VectorService extends BaseService {
                 topK: options.topK || 5,
                 includeMetadata: true,
                 includeVectors: false,
-                includeData: false
+                includeData: true
             };
 
             if (options.filter) {
@@ -180,6 +182,9 @@ class VectorService extends BaseService {
                 }
                 if (options.filter.sessionId) {
                     filters.push(`metadata.sessionId = "${options.filter.sessionId}"`);
+                }
+                if (options.filter.conversationId) {
+                    filters.push(`metadata.conversationId = "${options.filter.conversationId}"`);
                 }
                 if (options.filter.timeRange) {
                     filters.push(
@@ -220,10 +225,11 @@ class VectorService extends BaseService {
      */
     private processQueryResults(results: QueryResult[]): SimilaritySearchResult[] {
         return results.map(result => ({
-            id: result.id,
+            id: String(result.id),
             score: result.score,
             vector: result.vector || [],
-            metadata: result.metadata as VectorMetadata
+            metadata: result.metadata as VectorMetadata,
+            data: result.data
         }));
     }
 

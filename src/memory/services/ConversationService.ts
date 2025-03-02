@@ -7,6 +7,7 @@ import {
   TopicSegment,
   FirebaseConversation,
   CreateSummary,
+  Summary,
 } from '../types';
 import { ChatMessage } from '../types/conversation';
 import {
@@ -15,6 +16,7 @@ import {
   CONVERSATION_STATUS,
 } from '../constants/config';
 import { logger } from '../../utils/logger';
+import { contextRetrievalService } from './ContextRetrievalService';
 
 // Firebase-specific types that use string dates
 interface FirebaseMetadata
@@ -291,6 +293,52 @@ export class ConversationService extends BaseService {
     });
     
     return unsummarizedMessages;
+  }
+
+  /**
+   * Get relevant context for the current conversation based on a query
+   * @param conversationId The conversation ID
+   * @param query The query to find relevant context for
+   * @param options Options for context retrieval
+   * @returns Formatted context string for inclusion in LLM prompt
+   */
+  async getRelevantContext(
+    conversationId: string,
+    query: string,
+    options = { topK: 3 }
+  ): Promise<string> {
+    logger.info('Getting relevant context', {
+      conversationId,
+      queryPreview: query.substring(0, 50),
+      topK: options.topK
+    });
+    
+    try {
+      // Get relevant summaries based on the query
+      const summaries = await contextRetrievalService.getQueryBasedSummaries(
+        query,
+        conversationId,
+        options
+      );
+      
+      // Format summaries for inclusion in LLM context
+      const formattedContext = contextRetrievalService.formatSummariesForContext(summaries);
+      
+      logger.info('Retrieved relevant context', {
+        conversationId,
+        summaryCount: summaries.length
+      });
+      
+      return formattedContext;
+    } catch (error) {
+      logger.error('Error getting relevant context', {
+        conversationId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      
+      // Return a default message on error
+      return 'Unable to retrieve conversation context.';
+    }
   }
 
   /**

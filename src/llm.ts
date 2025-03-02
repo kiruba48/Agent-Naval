@@ -65,18 +65,20 @@ export const runLLM = async ({
   messages,
   temperature = 0.1,
   tools,
+  customSystemPrompt,
 }: {
   messages: AIMessage[];
   temperature?: number;
   model?: string;
   tools?: { name: string; parameters: z.AnyZodObject }[];
+  customSystemPrompt?: string;
 }) => {
   const formattedTools = tools?.map((tool) => zodFunction(tool));
 
   const response = await openai.chat.completions.create({
     model,
     messages: [
-      { role: 'system', content: systemPrompt },
+      { role: 'system', content: customSystemPrompt || systemPrompt },
       ...messages.map(convertToOpenAIMessage),
     ],
     temperature,

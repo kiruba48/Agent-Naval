@@ -6,12 +6,23 @@ import { messageProcessor } from './memory/services/initializeServices';
 import { conversationService } from './memory/services/ConversationService';
 import { logMessage, showLoader } from './ui';
 import { logger } from './utils/logger';
+import { systemPrompt } from './systemPrompt';
+import { DEFAULT_CONVERSATION_CONFIG } from './memory/constants/config';
 
 /**
  * Run the Naval Agent with tool support
+ * 
+ * Memory Hierarchy:
+ * 1. Immediate Context: Last 5 messages (always available)
+ * 2. Vector-Based Context: Summaries of previous conversations (only after 10+ messages)
+ * 
+ * The agent always has access to the immediate context. Vector-based context is only
+ * retrieved and included in the system prompt after enough messages have been processed
+ * to generate summaries (defined by DEFAULT_CONVERSATION_CONFIG.summaryInterval).
  */
 const MAX_TOOL_CALLS = 3;
 const TIMEOUT_MS = 30000; // 30 seconds
+const systemPromptValue = systemPrompt;
 
 export const runAgent = async ({
   userMessage,
@@ -33,6 +44,44 @@ export const runAgent = async ({
       content: userMessage,
       timestamp: new Date(),
     });
+
+    // Get conversation metadata to check message count
+    const metadata = await conversationService.getMetadata(conversationId);
+    
+    // Initialize relevant context
+    let relevantContext = '';
+    
+    // Only retrieve vector-based context if we have enough messages for summaries to exist
+    if (metadata.messageCount >= DEFAULT_CONVERSATION_CONFIG.summaryInterval) {
+      logger.debug('Retrieving vector-based context', {
+        conversationId,
+        messageCount: metadata.messageCount
+      });
+      
+      relevantContext = await conversationService.getRelevantContext(
+        conversationId,
+        userMessage,
+        { topK: 3 }
+      );
+      
+      logger.debug('Retrieved vector-based context', {
+        conversationId,
+        contextLength: relevantContext.length,
+        preview: relevantContext.substring(0, 100) + (relevantContext.length > 100 ? '...' : '')
+      });
+    } else {
+      logger.debug('Skipping vector-based context retrieval (not enough messages)', {
+        conversationId,
+        messageCount: metadata.messageCount,
+        summaryThreshold: DEFAULT_CONVERSATION_CONFIG.summaryInterval
+      });
+    }
+
+    // Create a dynamic system prompt that includes the context if available
+    let dynamicSystemPrompt = systemPromptValue;
+    if (relevantContext.trim()) {
+      dynamicSystemPrompt += `\n\n### Relevant Context From Previous Conversations\n${relevantContext}\n\nUse the above context to inform your responses when relevant.`;
+    }
 
     while (true) {
       // Get conversation history
@@ -60,6 +109,7 @@ export const runAgent = async ({
       const response = await runLLM({
         messages: history,
         tools,
+        customSystemPrompt: dynamicSystemPrompt,
       });
 
       //   logger.debug('Raw LLM Response', {
@@ -84,6 +134,9 @@ export const runAgent = async ({
         //   content: response.content,
         // });
         // logMessage(response);
+        // Process pending messages to ensure summaries are generated
+        await messageProcessor.processPendingMessages(conversationId);
+
         loader.stop();
         return response.content;
       }
@@ -94,6 +147,7 @@ export const runAgent = async ({
           conversationId,
           elapsed: Date.now() - startTime,
         });
+        
         loader.stop();
         return 'Request timed out after 30 seconds. Please try rephrasing your question.';
       }
@@ -106,6 +160,7 @@ export const runAgent = async ({
             conversationId,
             toolCallCount,
           });
+          
           loader.stop();
           return 'Maximum tool calls (3) reached. Please try a different approach.';
         }

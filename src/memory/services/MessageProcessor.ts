@@ -206,6 +206,39 @@ export class MessageProcessor extends BaseService {
   }
 
   /**
+   * Process any pending messages and trigger summary generation if needed
+   */
+  public async processPendingMessages(
+    conversationId: string
+  ): Promise<void> {
+    try {
+      // Get conversation metadata
+      const metadata = await this.conversationService.getMetadata(conversationId);
+      
+      // Check if we should generate a summary based on message count
+      if (
+        this.shouldGenerateSummary(metadata.messageCount) &&
+        !this.hasPendingToolCalls(conversationId)
+      ) {
+        logger.info('Processing pending messages and generating summary', {
+          conversationId,
+          messageCount: metadata.messageCount,
+        });
+        
+        await this.triggerSummaryGeneration(
+          conversationId, 
+          metadata.messageCount
+        );
+      }
+    } catch (error) {
+      logger.error('Error processing pending messages', {
+        conversationId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
    * Get messages for summary generation, handling tool calls appropriately.
    * This is used by both MessageProcessor and SummaryService to ensure consistent
    * message preparation for summarization.

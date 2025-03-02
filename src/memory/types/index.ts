@@ -60,6 +60,20 @@ export interface ConversationSummary extends CreateSummary {
 }
 
 /**
+ * Represents a summary retrieved for context
+ */
+export interface Summary {
+    id: string;
+    text: string;
+    conversationId: string;
+    userId: string;
+    timestamp: number;
+    similarityScore?: number;
+    type?: 'recent' | 'global';
+    themes?: string[];
+}
+
+/**
  * Represents the metadata for a conversation session
  */
 export interface ConversationMetadata {
