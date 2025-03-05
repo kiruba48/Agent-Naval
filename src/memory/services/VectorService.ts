@@ -208,7 +208,7 @@ class VectorService extends BaseService {
                 : await index.query({
                     ...baseOptions,
                     data: query,
-                    queryMode: QueryMode.HYBRID
+                    queryMode: QueryMode.DENSE  // Changed from HYBRID to DENSE for better results
                 });
 
             return Array.isArray(results) ? results : [results];

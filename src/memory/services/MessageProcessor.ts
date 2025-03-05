@@ -452,11 +452,16 @@ export class MessageProcessor extends BaseService {
     }
   }
 
-  /**
-   * Check if we should generate a summary based on message count
-   */
   private shouldGenerateSummary(messageCount: number): boolean {
-    return messageCount % this.config.summaryChunkSize === 0;
+    // Original condition - exact multiple of chunk size
+    const exactMultiple = messageCount % this.config.summaryChunkSize === 0;
+    
+    // New condition - above minimum threshold AND close to chunk size multiple
+    const nearMultiple = 
+      messageCount >= 5 && // Minimum message threshold
+      messageCount % this.config.summaryChunkSize >= (this.config.summaryChunkSize - 3); // Near a multiple
+    
+    return exactMultiple || nearMultiple;
   }
 
   /**

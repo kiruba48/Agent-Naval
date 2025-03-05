@@ -25,7 +25,7 @@ export const DEFAULT_RETRY_CONFIG: VectorRetryConfig = {
 // Default query options
 export const DEFAULT_QUERY_OPTIONS: Pick<Required<QueryOptions>, 'topK' | 'threshold'> & Partial<QueryOptions> = {
     topK: 5,
-    threshold: 0.5
+    threshold: 0.5  // Lowered from 0.7 to 0.5 for better retrieval
 };
 
 // Batch operation configuration
