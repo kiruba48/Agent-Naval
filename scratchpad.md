@@ -28,336 +28,169 @@
   * Keep tool definition and implementation separate
   * Match response schema exactly with the underlying service (e.g., vectorStore)
   * Use z.infer for type inference from Zod schemas
+- Keep imports organized by source:
+  * Base types from '../types'
+  * Feature-specific types from '../types/feature'
+  * Constants from '../constants/feature'
+  * This improves code organization and makes dependencies clearer
+- When working with OpenAI's chat API, save both tool calls and their responses to maintain complete conversation history
+- In TypeScript, when using OpenAI's chat API, message roles can only be 'user', 'assistant', or 'function' - not 'tool'
+- When using OpenAI's tool calling API, use role: 'tool' for tool responses and ensure tool_calls property uses snake_case (tool_calls, tool_call_id) not camelCase
+- When using OpenAI's chat API, message roles should be 'user', 'assistant', or 'function', and for tool responses, use role: 'tool' and ensure the tool_calls property uses snake_case.
+- Always maintain proper context between tool calls and their responses to prevent OpenAI API errors
+- Implement hard limits on tool calls (MAX_TOOL_CALLS = 3) and timeouts (30 seconds) to prevent infinite loops
+- Use Firebase's natural chronological ordering instead of manual sorting for better performance
+- Implement proper timestamp validation with year range checks (2000-2100) to prevent false positives
 
 # Scratchpad
 
-# Current Task: Implement Hierarchical Conversation Memory System
+# Current Task: Implement Memory System, Topic Management, and Summary System
 
-## Implementation Plan (2025-02-11)
+## Status Update (2025-02-27)
 
-### Phase 1: Basic Setup [IN PROGRESS]
+### Recently Resolved Issues
 
-[X] 1. Vector Store Setup
-    - Created VectorService class
-    - Implemented basic index management
-    - Added error handling
-    - Removed temporary implementations (to be added back later):
-      * Retry logic with exponential backoff
-      * Index validation with test vectors
-      * getIndex helper method
+[X] 1. Tool Call Loop Issues
+    - Implemented MAX_TOOL_CALLS limit (3)
+    - Added 30-second timeout
+    - Fixed message format for OpenAI's API
+    - Ensured proper tool_calls and tool_call_id property names
+    - Improved error handling for failed tool calls
+    - Enhanced loop prevention mechanisms
 
-[X] 2. Vector Operations
-    - Implement upsert for storing vectors
-    - Add query operations for similarity search
-    - Add batch operations for efficiency
-    - Re-implement retry logic with exponential backoff
-    - Add proper index validation
+[X] 2. Circular Dependencies
+    - Resolved circular dependency between MessageProcessor and SummaryService
+    - Implemented lazy initialization
+    - Added proper dependency injection
+    - Created initialization file for service ordering
+    - Updated service imports throughout the application
 
-[ ] 3. Session Management
-    - Implement 48-hour session limit
-    - Add session status tracking
-    - Create archival process
+[X] 3. Conversation History Formatting
+    - Fixed property naming (tool_calls vs toolCalls)
+    - Ensured proper context between tool calls and responses
+    - Implemented dual-format message display
+    - Enhanced message retrieval logic
+    - Maintained chronological ordering
+
+### Current Implementation Plan
+
+#### 1. Memory System [IN PROGRESS]
+
+[ ] Topic Change Detection
+    - Design algorithm to detect significant topic shifts
+    - Implement confidence scoring for topic changes
+    - Add triggers for summary generation on topic change
+    - Test with various conversation patterns
+
+[ ] Hierarchical Summaries
+    - Implement immediate context (5 messages)
+    - Add recent summary generation (10-20 messages)
+    - Create global session summary
+    - Ensure proper linking between summary levels
+
+[ ] Summary Retrieval System
+    - Design query interface for summaries
+    - Implement relevance-based retrieval
+    - Add filtering and sorting options
+    - Test with various query patterns
+
+[ ] Memory Pruning and Cleanup
+    - Design pruning strategy for old summaries
     - Implement cleanup for expired sessions
+    - Add archival process for important data
+    - Test with various session patterns
 
-[ ] 4. Integration Points
-    - Connect with ConversationService
-    - Link with SummaryService
-    - Integrate with existing knowledge base
+#### 2. Topic Management
 
-### Configuration Decisions:
+[ ] Theme Classification
+    - Design classification algorithm
+    - Implement confidence scoring
+    - Add support for multiple themes
+    - Test with various conversation topics
 
-1. **Session Management:**
-   - Store metadata in Firebase
-   - 48-hour session limit
-   - User-initiated end + auto-timeout
+[ ] Topic Segmentation
+    - Design segmentation algorithm
+    - Implement boundary detection
+    - Add support for nested topics
+    - Test with various conversation patterns
 
-2. **Vector Operations:**
-   - Batch embedding for initial implementation
-   - Embed only summaries (5 messages per summary)
-   - Similarity threshold: 0.75-0.8
-   - Return top 3-5 results
+[ ] Topic Change Triggers
+    - Design trigger system for topic changes
+    - Implement notification mechanism
+    - Add support for manual triggers
+    - Test with various trigger scenarios
 
-3. **Error Handling:**
-   - Short retry (2-3 attempts)
-   - Exponential backoff
-   - Log failures for monitoring
+[ ] Topic-based Context Retrieval
+    - Design retrieval interface for topics
+    - Implement relevance-based filtering
+    - Add support for cross-topic queries
+    - Test with various retrieval patterns
 
-### Next Steps:
+#### 3. Summary System
 
-1. Implement session management:
-   - Create session tracking
-   - Implement timeout logic
-   - Add cleanup process
+[ ] Immediate Context (5 messages)
+    - Design format for immediate context
+    - Implement generation algorithm
+    - Add support for tool call sequences
+    - Test with various conversation patterns
 
-2. Create integration points:
-   - Connect with existing services
-   - Add event handlers
-   - Implement error recovery
+[ ] Recent Summary (10-20 messages)
+    - Design format for recent summary
+    - Implement generation algorithm
+    - Add support for topic changes
+    - Test with various conversation patterns
 
-3. Focus on phase 2 and 3 tasks:
-   - Implement memory enhancement
-   - Add topic analysis
-   - Implement performance optimization
+[ ] Global Session Summary
+    - Design format for global summary
+    - Implement generation algorithm
+    - Add support for multiple topics
+    - Test with various session patterns
 
-### Notes:
+[ ] Summary Embeddings Storage
+    - Design storage format for embeddings
+    - Implement batch processing
+    - Add support for incremental updates
+    - Test with various embedding models
 
-- Using OpenAI's text-embedding-3-small model (1024 dimensions)
-- Separate indices for knowledge base and conversations
-- Focus on minimal setup first, then scale
-- Monitor token usage and adjust as needed
+[ ] Relevance-based Retrieval
+    - Design retrieval interface
+    - Implement similarity search
+    - Add support for filtering and sorting
+    - Test with various query patterns
 
-### Lessons Learned:
-- Upstash Vector Index constructor requires url and token parameters
-- reset() method is for clearing index, not creating one
-- Keep implementation simple initially, add complexity when needed
-- Validate actual requirements before implementing features
+### Next Steps
 
-# Conversation Memory Implementation - Phase 1
+1. Start with Topic Change Detection:
+   - Research algorithms for detecting topic shifts
+   - Design confidence scoring system
+   - Implement prototype for testing
+   - Evaluate with sample conversations
 
-## Implementation Plan
+2. Then move to Hierarchical Summaries:
+   - Design summary formats for each level
+   - Implement generation algorithms
+   - Test with various conversation patterns
+   - Evaluate summary quality
 
-### 1. Basic Workflow
-[X] Vector Service Implementation
-[ ] First Iteration: Basic Conversation Flow with Summaries
+3. Finally, implement Summary Retrieval:
+   - Design query interface
+   - Implement similarity search
+   - Test with various query patterns
+   - Evaluate retrieval quality
 
-### Current Task: First Iteration Implementation
+### Decision Points
 
-#### Components and Flow:
+1. **Topic Detection Approach**:
+   - Rule-based vs. ML-based
+   - Threshold for topic change
+   - Handling of subtopics
 
-1. **Message Processing** [IN PROGRESS]
-   [X] Create MessageProcessor service
-   [X] Implement message pair processing
-   [X] Add error handling and types
-   [X] Implement background summary generation
-   [ ] Add tests for MessageProcessor
-   [ ] Add logging and monitoring
-   [ ] Add retry strategies for failed operations
+2. **Summary Generation**:
+   - Extractive vs. abstractive
+   - Length and detail level
+   - Handling of tool calls
 
-2. **Summary Generation**
-   [ ] Create SummaryGenerator service
-   [ ] Implement chunk-based summary generation
-   [ ] Add metadata and theme extraction
-   [ ] Store summaries in Firebase and Upstash
-   [ ] Add tests for summary generation
-
-   Implementation details:
-   - Generate summaries for strictly sequential chunks (1-10, 11-20, etc.)
-   - Include message content and essential metadata
-   - Store summaries in both Firebase and Upstash
-   - Only embed summaries (not individual messages)
-
-3. **Context Retrieval**
-   [ ] Create ContextAssembler service
-   [ ] Implement relevant summary retrieval
-   [ ] Add recent message handling
-   [ ] Format context for LLM prompt
-   [ ] Add tests for context assembly
-
-   Implementation details:
-   - Retrieve top 3-5 relevant summaries
-   - Combine with last 3-5 message pairs
-   - Format context for LLM prompt
-
-#### Progress (2025-02-11):
-
-1. Completed MessageProcessor implementation:
-   - Added types for messages and operations
-   - Implemented message pair processing
-   - Added error handling with retries
-   - Made summary generation asynchronous
-   - Added proper error types and operation tracking
-   - Improved type safety with enums
-
-2. Next steps:
-   - Add tests for MessageProcessor
-   - Implement SummaryGenerator service
-   - Add logging and monitoring
-   - Implement retry strategies
-
-3. Lessons learned:
-   - Keep types and operations separate
-   - Use enums for better type safety
-   - Make summary generation non-blocking
-   - Handle errors at appropriate levels
-
-#### Implementation Details:
-
-1. **Message Flow**
-```typescript
-interface MessageProcessor {
-    // Track message pairs and trigger summary
-    async processMessagePair(
-        conversationId: string,
-        userMessage: string,
-        assistantMessage: string
-    ): Promise<void>;
-
-    // Check if summary needed (every 10 messages)
-    private shouldGenerateSummary(messageCount: number): boolean;
-}
-```
-
-2. **Summary Generation**
-```typescript
-interface SummaryGenerator {
-    // Generate summary from message chunk
-    async generateChunkSummary(
-        messages: Message[], 
-        metadata: ConversationMetadata
-    ): Promise<Summary>;
-
-    // Store summary in both Firebase and Upstash
-    private async storeSummary(
-        summary: Summary, 
-        embedding: number[]
-    ): Promise<void>;
-}
-```
-
-3. **Context Assembly**
-```typescript
-interface ContextAssembler {
-    // Get context for new message
-    async assembleContext(
-        conversationId: string,
-        query: string
-    ): Promise<string>;
-
-    // Format prompt with summaries and recent messages
-    private formatPrompt(
-        summaries: Summary[],
-        recentMessages: Message[],
-        query: string
-    ): string;
-}
-```
-
-#### LLM Integration:
-Using existing `generateText` and `generateEmbeddings` functions from `llm.ts`:
-- `generateText`: For generating summaries and responses
-- `generateEmbeddings`: For embedding summaries in Upstash
-
-#### Prompt Template:
-```typescript
-const PROMPT_TEMPLATE = `
-SYSTEM:
-"You are Mentor Agent, an AI trained to provide insightful guidance on mindfulness, entrepreneurship, and personal development.
-Always be concise, accurate, and maintain a friendly tone."
-
-CONTEXT (FROM RETRIEVED SUMMARIES):
-{summaries}
-
-RECENT DIALOGUE:
-{recentMessages}
-
-NEW USER QUERY:
-{query}
-`;
-```
-
-### Next Steps:
-[ ] 1. Implement MessageProcessor
-    - Add message pair tracking
-    - Add summary trigger logic
-
-[ ] 2. Implement SummaryGenerator
-    - Add summary generation with LLM
-    - Add Firebase and Upstash storage
-
-[ ] 3. Implement ContextAssembler
-    - Add context retrieval logic
-    - Add prompt formatting
-
-[ ] 4. Testing
-    - Test basic conversation flow
-    - Test summary generation
-    - Test context retrieval
-    - Test end-to-end workflow
-
-### Questions to Address:
-1. How to handle failed summary generation?
-2. How to handle concurrent message processing?
-3. Should we implement retry logic for failed operations?
-4. How to handle context window size limits?
-
-### Technical Prerequisites:
-1. Firebase configuration 
-2. Upstash Vector setup 
-3. LLM integration 
-4. OpenAI embeddings integration 
-
-# Vector Service Implementation Progress
-
-## Completed Tasks
-[X] Fix type errors in VectorService implementation
-[X] Update VectorMetadata interface and move to types file
-[X] Optimize batch operations
-[X] Add detailed logging and progress tracking
-  - Added BatchOperationStats interface
-  - Added real-time progress updates
-  - Added success rate calculations
-  - Added comprehensive operation summaries
-
-## Current Implementation
-- Using OpenAI's text-embedding-3-small model (1024 dimensions)
-- Batch operations with configurable chunk size (default: 20)
-- Concurrent processing with limits (default: 3 concurrent batches)
-- Detailed logging and progress tracking for all operations
-
-## Next Steps
-[ ] Add retry strategy configuration
-  - Configurable backoff delays
-  - Operation-specific retry attempts
-  - Custom retry conditions
-
-[ ] Improve error handling
-  - Add error categorization
-  - Add error recovery strategies
-  - Add detailed error context
-
-[ ] Add performance optimizations
-  - Add caching for frequently accessed vectors
-  - Add connection pooling
-  - Add request batching for similar operations
-
-[ ] Add monitoring and metrics
-  - Add operation latency tracking
-  - Add success/failure rate metrics
-  - Add resource usage monitoring
-
-[ ] Add data validation and sanitization
-  - Add input validation for vectors
-  - Add metadata validation
-  - Add data type conversions
-
-[ ] Add cleanup and maintenance
-  - Add index cleanup utilities
-  - Add vector pruning strategies
-  - Add index optimization routines
-
-## Lessons Learned
-1. Always validate vector dimensions before operations
-2. Use string IDs for Upstash operations (convert from number if needed)
-3. Batch deletes can be done in a single operation, no need for chunking
-4. Include detailed logging for debugging and monitoring
-5. Track operation progress for long-running batch operations
-
-## Questions to Consider
-1. Should we add automatic retries for specific error types?
-2. Should we add automatic cleanup of old vectors?
-3. Should we add vector validation before every operation?
-4. Should we add more sophisticated progress tracking?
-5. Should we add more detailed performance metrics?
-
-# Today's Lessons (2025-02-06)
-
-## TypeScript Type System
-- When extending interfaces in TypeScript, optional properties (`property?: type`) in the base interface are not compatible with required properties (`property: type`) in the extended interface
-- When transforming arrays of objects with optional properties to arrays with required properties, use explicit mapping with the nullish coalescing operator (`??`) to provide default values
-- TypeScript's type system helps catch potential runtime errors by enforcing proper property presence, especially important in data processing pipelines
-
-## Q&A Pipeline Development
-- Maintain a clear separation between base data types (like QAPair) and their processed versions (like FinalQAPair) to ensure data validation at compile time
-- Use explicit type transformations when moving data through pipeline stages to ensure data integrity
-- Document pipeline stages and data transformations in both code comments and project documentation (INSTRUCTIONS.md) for better maintainability
-- Keep track of completed and remaining tasks in a structured format to maintain project momentum and clarity
+3. **Retrieval Strategy**:
+   - Vector similarity vs. keyword
+   - Ranking algorithm
+   - Filtering options

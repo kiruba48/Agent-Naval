@@ -1,0 +1,91 @@
+# Critical Implementation Paths
+
+1. Message Processing
+
+   - Firebase's natural chronological ordering is crucial for conversation coherence
+   - Push IDs provide automatic chronological sorting
+   - Avoid manual sorting to prevent context disruption
+   - Use slice operations for efficient message retrieval
+
+2. Tool Call Management
+   - Maximum 3 consecutive tool calls
+   - 30-second timeout for tool operations
+   - Single tool call per response
+   - Work with available data rather than chaining calls
+
+# User Preferences and Workflow
+
+1. Response Quality
+
+   - Complete, self-contained answers preferred
+   - Clear acknowledgment of limitations
+   - Structured responses with confidence levels
+   - Explicit source attribution
+
+2. Performance Expectations
+   - Fast response times (<2s for text)
+   - Smooth conversation flow
+   - Clear progress indicators
+   - Graceful error handling
+
+# Project-Specific Patterns
+
+1. Conversation Flow
+
+   - Maintain chronological message order
+   - Preserve context between exchanges
+   - Handle tool responses consistently
+   - Track tool call sequences
+
+2. Error Recovery
+   - Graceful degradation on limits
+   - Clear user feedback
+   - State preservation
+   - Clean session handling
+
+# Known Challenges
+
+1. Tool Call Loops
+
+   - Monitor consecutive calls
+   - Enforce strict timeouts
+   - Clear completion criteria
+   - Prevent circular references
+
+2. Message Ordering
+   - Trust Firebase Push IDs
+   - Minimize data transformations
+   - Efficient context windowing
+   - Consistent timestamp handling
+
+# Evolution of Project Decisions
+
+1. Message Storage
+
+   - Initially: Manual sorting and reordering
+   - Now: Leverage Firebase's natural order
+   - Impact: Better performance, fewer bugs
+   - Future: Consider caching strategies
+
+2. Tool Usage
+   - Initially: Unlimited tool calls
+   - Now: Strict limits and timeouts
+   - Impact: More reliable responses
+   - Future: Adaptive limits based on context
+
+# Tool Usage Patterns
+
+1. Knowledge Base Queries
+
+   - Single query per response
+   - Work with available results
+   - Clear confidence indicators
+   - Source attribution
+
+2. Response Formation
+   - Complete answers in one pass
+   - Include relevant context
+   - Clear structure
+   - Actionable insights
+
+This living document captures our learnings about effective conversation management and tool usage patterns. It will continue to evolve as we discover new insights and optimize our approach.

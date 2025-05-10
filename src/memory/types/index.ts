@@ -1,24 +1,27 @@
 /**
- * Core type definitions for the conversation memory system
+ * Core type definitions for the conversation memory system.
+ * Contains only base types and interfaces.
+ * Service-specific types should be imported directly from their respective files.
  */
 
-/**
- * Base types for creation of entities
- */
+// Base types for entity creation
 export interface CreateMessage {
-    role: 'user' | 'assistant' | 'system';
-    content: string;
+    role: 'user' | 'assistant' | 'system' | 'tool';
+    content: string | null;
     timestamp: Date;
     themes?: string[];
     embedding?: number[];
-    toolCalls?: Array<{
+    tool_calls?: Array<{
         id: string;
+        type: 'function';
         function: {
             name: string;
             arguments: string;
         };
     }>;
-    toolCallId?: string;
+    tool_call_id?: string;
+    name?: string;
+    summarized?: boolean; // Whether this message has been included in a summary
 }
 
 export interface CreateSummary {
@@ -38,6 +41,7 @@ export interface CreateSummary {
  */
 export interface Message extends CreateMessage {
     id: string;
+    summarized?: boolean; // Whether this message has been included in a summary
 }
 
 export interface TopicSegment {
@@ -53,6 +57,20 @@ export interface TopicSegment {
 
 export interface ConversationSummary extends CreateSummary {
     id: string;
+}
+
+/**
+ * Represents a summary retrieved for context
+ */
+export interface Summary {
+    id: string;
+    text: string;
+    conversationId: string;
+    userId: string;
+    timestamp: number;
+    similarityScore?: number;
+    type?: 'recent' | 'global';
+    themes?: string[];
 }
 
 /**

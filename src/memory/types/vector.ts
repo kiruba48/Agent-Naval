@@ -32,7 +32,7 @@ export interface VectorMetadata {
 }
 
 export interface VectorEntry {
-    id: string | number;
+    id: string;
     vector: number[];
     metadata?: VectorMetadata;
 }
@@ -58,7 +58,7 @@ export interface QueryOptions {
 }
 
 export interface SimilaritySearchResult {
-    id: string | number;
+    id: string;
     score: number;
     vector: number[];
     metadata?: VectorMetadata;

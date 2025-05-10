@@ -4,14 +4,14 @@ import { VectorIndexConfig, VectorRetryConfig, QueryOptions } from '../types/vec
 export const VECTOR_INDICES: { [key: string]: VectorIndexConfig } = {
     KNOWLEDGE: {
         name: 'knowledge',
-        url: process.env.UPSTASH_KNOWLEDGE_URL!,
-        token: process.env.UPSTASH_KNOWLEDGE_TOKEN!,
+        url: process.env.UPSTASH_VECTOR_REST_URL!,
+        token: process.env.UPSTASH_VECTOR_REST_TOKEN!,
         dimensions: 1024 // text-embedding-3-small dimensions
     },
     CONVERSATIONS: {
         name: 'conversations',
-        url: process.env.UPSTASH_CONVERSATIONS_URL!,
-        token: process.env.UPSTASH_CONVERSATIONS_TOKEN!,
+        url: process.env.UPSTASH_VECTOR_REST_URL_CONVERSATION!,
+        token: process.env.UPSTASH_VECTOR_REST_TOKEN_CONVERSATION!,
         dimensions: 1024
     }
 };
@@ -25,7 +25,7 @@ export const DEFAULT_RETRY_CONFIG: VectorRetryConfig = {
 // Default query options
 export const DEFAULT_QUERY_OPTIONS: Pick<Required<QueryOptions>, 'topK' | 'threshold'> & Partial<QueryOptions> = {
     topK: 5,
-    threshold: 0.7
+    threshold: 0.5  // Lowered from 0.7 to 0.5 for better retrieval
 };
 
 // Batch operation configuration
